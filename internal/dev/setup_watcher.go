@@ -75,7 +75,7 @@ func handleGoFileChange(
 	evt fsnotify.Event,
 ) {
 	if config.DevConfig.ServerOnly {
-		util.Log.Infof("modified: %s, needs a full recompile", evt.Name)
+		util.Log.Infof("modified: %s, recompiling", evt.Name)
 		killBuildAndRestartAppDev(config)
 		return
 	}

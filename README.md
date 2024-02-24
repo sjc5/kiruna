@@ -9,6 +9,10 @@
 - **📦 Automatic CSS bunding and static asset hashing / embedding**
 - **📝 Compatible with any Go templating engine**
 
+## Examples
+
+Check out the [examples repository](https://github.com/sjc5/kiruna-examples) to see how to get started with a minimal Kiruna setup.
+
 ## Quick note on project status and documentation quality
 
 This project is in alpha stage. Some of the documentation is in comments in the code rather than below. You may need to piece some things together until I get the API finalized and the documentation cleaned up. Definitely feel free to reach out if you have any questions.
