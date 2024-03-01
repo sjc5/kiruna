@@ -6,6 +6,7 @@ import (
 
 	"github.com/sjc5/kiruna/internal/buildtime"
 	"github.com/sjc5/kiruna/internal/common"
+	"github.com/sjc5/kiruna/internal/runtime"
 	"github.com/sjc5/kiruna/internal/util"
 )
 
@@ -36,6 +37,12 @@ func Dev(config *common.Config) {
 		mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			sseHandler(manager)(w, r)
+		})
+
+		mux.HandleFunc("/get-refresh-script-inner", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Content-Type", "text/javascript")
+			w.Write([]byte(runtime.GetRefreshScriptInner(config.DevConfig.RefreshServerPort)))
 		})
 
 		if err := http.ListenAndServe(":"+strconv.Itoa(config.DevConfig.RefreshServerPort), mux); err != nil {
