@@ -13,8 +13,8 @@ fi
 current_tag=$(git describe --tags --abbrev=0)
 
 if [ -z "$current_tag" ]; then 
-    echo "no existing tags found. add a new tag by running:"
-    printf "\`\`\`sh\n\033[0;34mgit tag v0.0.1\ngit push origin v0.0.1\n\033[0m\`\`\`\n"
+    echo "no existing tags found. get started by running:"
+    printf "\`\`\`sh\n\033[0;34mgit tag v0.0.1\ngit push origin v0.0.1\nGOPROXY=proxy.golang.org go list -m all\n\033[0m\`\`\`\n"
     echo "aborted"
     exit 1
 else

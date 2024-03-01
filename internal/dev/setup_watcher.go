@@ -147,7 +147,7 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 	if wfc.RecompileBinary {
 		util.Log.Infof("doing a full recompile")
 	} else {
-		util.Log.Infof("not doing a full recompile")
+		util.Log.Infof("skipping full recompile")
 	}
 	if wfc.RecompileBinary || wfc.RestartApp {
 		util.Log.Infof("killing running app")
@@ -215,14 +215,13 @@ func isDirOrChildOfDir(dir string, parent string) bool {
 }
 
 func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) error {
-	cleanRootDir := config.GetCleanRootDir()
-	return filepath.Walk(cleanRootDir, func(walkedPath string, info os.FileInfo, err error) error {
+	return filepath.Walk(path, func(walkedPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if info.IsDir() {
 			for _, ignoreDir := range append(getStandardIgnoreDirList(config), config.DevConfig.IgnoreDirs...) {
-				ignoreDirRelative := filepath.Join(cleanRootDir, ignoreDir)
+				ignoreDirRelative := filepath.Join(config.GetCleanRootDir(), ignoreDir)
 				if isDirOrChildOfDir(walkedPath, ignoreDirRelative) {
 					util.Log.Infof("ignoring directory: %s", walkedPath)
 					return filepath.SkipDir
