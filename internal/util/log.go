@@ -31,8 +31,8 @@ func (l *colorLogger) logf(level, format string, args ...interface{}) {
 		colorCode = "\033[33m" // Yellow
 	case "error":
 		colorCode = "\033[31m" // Red
-	case "fatal":
-		colorCode = "\033[31m" // Bold red for fatal
+	case "panic":
+		colorCode = "\033[31m" // Bold red for panic
 	}
 	// Print message with label and color
 	labelToUse := l.label

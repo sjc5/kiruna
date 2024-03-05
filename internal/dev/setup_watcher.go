@@ -14,6 +14,7 @@ import (
 )
 
 func setupWatcher(manager *ClientManager, config *common.Config) {
+	defer killAppDev()
 	setupExtKeys(config)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -40,7 +41,7 @@ func handleWatcherEmissions(config *common.Config, manager *ClientManager, watch
 			if getIsModifyEvt(evt) {
 				evtDetails := getEvtDetails(config, evt)
 				if getIsGo(evt) {
-					handleGoFileChange(config, manager, evt)
+					handleGoFileChange(config, manager, evt, evtDetails)
 				} else {
 					if !config.DevConfig.ServerOnly {
 						if evtDetails.isCriticalCss {
@@ -69,11 +70,27 @@ func handleWatcherEmissions(config *common.Config, manager *ClientManager, watch
 	}
 }
 
+func conditionallyRunOnChangeCallback(
+	wfc common.WatchedFile,
+	evt fsnotify.Event,
+) {
+	if wfc.OnChange != nil {
+		util.Log.Infof("running extension callback")
+		err := wfc.OnChange(evt.Name)
+		if err != nil {
+			util.Log.Errorf("error running extension callback: %v", err)
+		}
+	}
+}
+
 func handleGoFileChange(
 	config *common.Config,
 	manager *ClientManager,
 	evt fsnotify.Event,
+	evtDetails EvtDetails,
 ) {
+	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
+	conditionallyRunOnChangeCallback(wfc, evt)
 	if config.DevConfig.ServerOnly {
 		util.Log.Infof("modified: %s, recompiling", evt.Name)
 		killBuildAndRestartAppDev(config)
@@ -130,13 +147,7 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 		}
 		util.Log.Infof("modified: %s, rebuilding static assets", evt.Name)
 	}
-	if wfc.OnChange != nil {
-		util.Log.Infof("running extension callback")
-		err := wfc.OnChange(evt.Name)
-		if err != nil {
-			util.Log.Errorf("error running extension callback: %v", err)
-		}
-	}
+	conditionallyRunOnChangeCallback(wfc, evt)
 	if wfc.RunOnChangeOnly {
 		// You would do this if you want to trigger a process that itself
 		// saves to a file (evt.g., to styles/critical/whatever.css) that
@@ -181,7 +192,7 @@ func reloadBroadcast(config *common.Config, manager *ClientManager, rfp RefreshF
 		manager.broadcast <- rfp
 		return
 	}
-	util.Log.Errorf("error: app never became ready, not broadcasting refresh event: %v", rfp.ChangeType)
+	util.Log.Panicf("error: app never became ready: %v", rfp.ChangeType)
 }
 
 var extKeys []string = nil
