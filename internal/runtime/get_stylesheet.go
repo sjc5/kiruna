@@ -22,7 +22,7 @@ func GetStyleSheetURL(config *common.Config) string {
 		util.Log.Errorf("error reading normal CSS URL: %v", err)
 		return ""
 	}
-	return "/public/hashed/" + string(content)
+	return "/public/" + string(content)
 }
 
 func GetStyleSheetLinkElement(config *common.Config) template.HTML {

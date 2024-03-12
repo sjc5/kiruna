@@ -69,7 +69,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 	case "critical":
 		outputPath = filepath.Join(cleanRootDir, "dist", "kiruna", "internal")
 	case "normal":
-		outputPath = filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public", "hashed")
+		outputPath = filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public")
 	}
 
 	outputFileName := subDir + ".css" // Default for 'critical'

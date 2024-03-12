@@ -48,7 +48,7 @@ func handlePublicFiles(cleanRootDir string) error {
 			publicFileMap[relativePath] = hashed
 
 			// Now actually copy the file to the dist directory
-			distPath := filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public", "hashed", hashed)
+			distPath := filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public", hashed)
 			err = os.WriteFile(distPath, contentBytes, 0644)
 			if err != nil {
 				return err

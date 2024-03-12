@@ -90,8 +90,8 @@ func handleGoFileChange(
 	evtDetails EvtDetails,
 ) {
 	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
-	conditionallyRunOnChangeCallback(wfc, evt)
 	if config.DevConfig.ServerOnly {
+		conditionallyRunOnChangeCallback(wfc, evt)
 		util.Log.Infof("modified: %s, recompiling", evt.Name)
 		killBuildAndRestartAppDev(config)
 		return
@@ -99,6 +99,7 @@ func handleGoFileChange(
 	manager.broadcast <- RefreshFilePayload{
 		ChangeType: ChangeTypeRebuilding,
 	}
+	conditionallyRunOnChangeCallback(wfc, evt)
 	util.Log.Infof("modified: %s, needs a full recompile", evt.Name)
 	killBuildAndRestartAppDev(config)
 	if config.DevConfig.ServerOnly {
@@ -120,6 +121,22 @@ func handleCSSFileChange(
 	evt fsnotify.Event,
 	cssType ChangeType,
 ) {
+	if config.DevConfig.CSSConfig.OnChange != nil {
+		isIgnored := false
+		for _, ignoreFile := range config.DevConfig.CSSConfig.IgnoredFiles {
+			if strings.HasSuffix(evt.Name, ignoreFile) {
+				isIgnored = true
+				break
+			}
+		}
+		if !isIgnored {
+			util.Log.Infof("running css callback")
+			err := config.DevConfig.CSSConfig.OnChange(evt.Name)
+			if err != nil {
+				util.Log.Errorf("error running extension callback: %v", err)
+			}
+		}
+	}
 	err := buildtime.ProcessCSS(config, string(cssType))
 	if err != nil {
 		util.Log.Panicf("error processing %s CSS: %v", cssType, err)
@@ -234,7 +251,6 @@ func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) erro
 			for _, ignoreDir := range append(getStandardIgnoreDirList(config), config.DevConfig.IgnoreDirs...) {
 				ignoreDirRelative := filepath.Join(config.GetCleanRootDir(), ignoreDir)
 				if isDirOrChildOfDir(walkedPath, ignoreDirRelative) {
-					util.Log.Infof("ignoring directory: %s", walkedPath)
 					return filepath.SkipDir
 				}
 			}

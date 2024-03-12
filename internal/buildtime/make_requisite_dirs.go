@@ -25,10 +25,10 @@ func MakeRequisiteDirs(config *common.Config) error {
 		util.Log.Errorf("error making keep_me file: %v", err)
 		return err
 	}
-	// need an empty dist/kiruna/public/hashed directory
-	path = filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public", "hashed")
+	// need an empty dist/kiruna/public directory
+	path = filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public")
 	if err := os.MkdirAll(path, 0755); err != nil {
-		util.Log.Errorf("error making hashed directory: %v", err)
+		util.Log.Errorf("error making public directory: %v", err)
 		return err
 	}
 	// need an empty dist/kiruna/private directory

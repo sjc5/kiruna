@@ -24,7 +24,7 @@ func GetPublicURL(config *common.Config, originalPublicURL string) string {
 	hashed, ok := fileMapFromGlob[cleanedOriginalPublicURL]
 	if !ok {
 		util.Log.Infof("GetPublicURL: no hashed URL found for %s, returning original URL", originalPublicURL)
-		return originalPublicURL
+		return "/public/" + originalPublicURL
 	}
-	return "/public/hashed/" + hashed
+	return "/public/" + hashed
 }

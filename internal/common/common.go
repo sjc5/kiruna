@@ -79,6 +79,13 @@ type DevConfig struct {
 	IgnoreDirs []string
 
 	ServerOnly bool
+
+	CSSConfig CSSConfig
+}
+
+type CSSConfig struct {
+	OnChange     func(string) error
+	IgnoredFiles []string
 }
 
 type WatchedFile struct {
