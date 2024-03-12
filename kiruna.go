@@ -65,8 +65,8 @@ func (k Kiruna) GetCriticalCSSStyleElement() template.HTML {
 func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
 	return runtime.GetStyleSheetLinkElement(k.Config)
 }
-func (k Kiruna) GetServeStaticHandler(pathPrefix string) http.Handler {
-	return runtime.GetServeStaticHandler(k.Config, pathPrefix)
+func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
+	return runtime.GetServeStaticHandler(k.Config, pathPrefix, cacheImmutably)
 }
 func (k Kiruna) GetIsDev() bool {
 	return common.GetIsKirunaEnvDev()
