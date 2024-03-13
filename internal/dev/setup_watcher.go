@@ -123,7 +123,7 @@ func handleCSSFileChange(
 ) {
 	if config.DevConfig.CSSConfig.OnChange != nil {
 		isIgnored := false
-		for _, ignoreFile := range config.DevConfig.CSSConfig.IgnoredFiles {
+		for _, ignoreFile := range config.DevConfig.CSSConfig.OnChangeExcludedFiles {
 			if strings.HasSuffix(evt.Name, ignoreFile) {
 				isIgnored = true
 				break
