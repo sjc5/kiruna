@@ -225,7 +225,7 @@ func setupExtKeys(config *common.Config) {
 	}
 }
 
-var standardIgnoreDirList = []string{}
+var standardIgnoreDirList = []string{".git", "node_modules", "dist/bin", "dist/kiruna"}
 
 func getStandardIgnoreDirList(config *common.Config) []string {
 	if len(standardIgnoreDirList) > 0 {
@@ -275,10 +275,13 @@ type EvtDetails struct {
 }
 
 func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
-	isCss := getIsCss(evt)
+	isCssSimple := getIsCss(evt)
+	isCriticalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeCriticalCSS)
+	isNormalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeNormalCSS)
+	isCss := isCriticalCss || isNormalCss
 	shouldReload := false
 	var complexExtension string
-	if !getIsCss(evt) {
+	if !isCss {
 		for _, ext := range extKeys {
 			if strings.HasSuffix(evt.Name, ext) {
 				shouldReload = true
@@ -288,8 +291,8 @@ func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
 		}
 	}
 	return EvtDetails{
-		isCriticalCss:    isCss && getIsCssEvtType(config, evt, ChangeTypeCriticalCSS),
-		isNormalCss:      isCss && getIsCssEvtType(config, evt, ChangeTypeNormalCSS),
+		isCriticalCss:    isCriticalCss,
+		isNormalCss:      isNormalCss,
 		shouldReload:     shouldReload,
 		complexExtension: complexExtension,
 	}
