@@ -33,7 +33,7 @@ func (k Kiruna) GetPrivateFS() (*runtime.UniversalFS, error) {
 	return runtime.GetPrivateFS(k.Config)
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
-	return runtime.GetPublicURL(k.Config, originalPublicURL)
+	return runtime.GetPublicURL(k.Config, originalPublicURL, false)
 }
 func (k Kiruna) MakeRequisiteDirs() error {
 	return buildtime.MakeRequisiteDirs(k.Config)

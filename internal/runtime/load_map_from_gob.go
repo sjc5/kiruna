@@ -8,8 +8,14 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 )
 
-func loadMapFromGob(config *common.Config, gobFileName string) (common.Map, error) {
-	FS, err := GetUniversalFS(config)
+func loadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (common.Map, error) {
+	var FS *UniversalFS
+	var err error
+	if useDirFS {
+		FS, err = GetUniversalDirFS(config)
+	} else {
+		FS, err = GetUniversalFS(config)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error getting FS: %v", err)
 	}

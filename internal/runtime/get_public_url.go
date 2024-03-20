@@ -10,10 +10,12 @@ import (
 
 var fileMapFromGlob common.Map
 
-func GetPublicURL(config *common.Config, originalPublicURL string) string {
+// __TODO -- need to read from FS during build!
+
+func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool) string {
 	if fileMapFromGlob == nil {
 		var err error
-		fileMapFromGlob, err = loadMapFromGob(config, common.PublicFileMapGobName)
+		fileMapFromGlob, err = loadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
 		if err != nil {
 			util.Log.Errorf("error loading file map from gob: %v", err)
 			return originalPublicURL

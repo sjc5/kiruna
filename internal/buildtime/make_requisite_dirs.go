@@ -19,10 +19,10 @@ func MakeRequisiteDirs(config *common.Config) error {
 		util.Log.Errorf("error making internal directory: %v", err)
 		return err
 	}
-	// add a keep_me file so that go:embed doesn't complain
-	path = filepath.Join(cleanRootDir, "dist", "kiruna", "keep_me")
+	// add a x file so that go:embed doesn't complain
+	path = filepath.Join(cleanRootDir, "dist", "kiruna", "x")
 	if err := os.WriteFile(path, []byte(""), 0644); err != nil {
-		util.Log.Errorf("error making keep_me file: %v", err)
+		util.Log.Errorf("error making x file: %v", err)
 		return err
 	}
 	// need an empty dist/kiruna/public directory

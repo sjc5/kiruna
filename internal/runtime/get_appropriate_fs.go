@@ -11,6 +11,11 @@ import (
 
 var universalFS *UniversalFS
 
+func GetUniversalDirFS(config *common.Config) (*UniversalFS, error) {
+	universalFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+	return universalFS, nil
+}
+
 func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	if universalFS != nil {
 		return universalFS, nil
@@ -21,7 +26,6 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// where your go.mod file is.
 	if common.GetIsKirunaEnvDev() {
 		util.Log.Infof("using disk file system (development)")
-		// drop into "/dist"
 		universalFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
 		return universalFS, nil
 	}
@@ -31,7 +35,6 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	if config.GetIsUsingEmbeddedFS() {
 		util.Log.Infof("using embedded file system (production)")
 		distFS := config.DistFS
-		// drop into "/dist" subdirectory
 		FS, err := fs.Sub(distFS, "dist")
 		if err != nil {
 			return nil, err

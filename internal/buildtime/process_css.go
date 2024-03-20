@@ -55,7 +55,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 		rawUrl := UrlRegex.FindStringSubmatch(match)[1]
 		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
 		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
-			hashedUrl := runtime.GetPublicURL(config, cleanedUrl)
+			hashedUrl := runtime.GetPublicURL(config, cleanedUrl, true)
 			return fmt.Sprintf("url(%s)", hashedUrl)
 		} else {
 			return match // Leave external URLs unchanged
