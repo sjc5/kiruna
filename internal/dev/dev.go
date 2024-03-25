@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -13,12 +14,24 @@ import (
 func Dev(config *common.Config) {
 	common.SetKirunaEnvDev()
 
+	var err error
+	if config.DevConfig.RefreshServerPort == 0 {
+		config.DevConfig.RefreshServerPort, err = util.GetFreePort()
+		if err != nil {
+			fmt.Printf("error: failed to get free port: %v\n", err)
+			fmt.Printf("using default port number %d\n", 51027)
+			fmt.Printf("to specify a different port for the sidecar dev refresh server, manually set DevConfig.RefreshServerPort in your config\n")
+			config.DevConfig.RefreshServerPort = 51027
+			return
+		}
+	}
+
 	if config.DevConfig == nil {
 		util.Log.Panicf("error: no dev config found")
 		return
 	}
 
-	err := buildtime.Build(config, false)
+	err = buildtime.Build(config, false)
 	if err != nil {
 		util.Log.Panicf("error: build process failed: %v", err)
 	}

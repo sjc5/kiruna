@@ -10,8 +10,6 @@ import (
 
 var fileMapFromGlob common.Map
 
-// __TODO -- need to read from FS during build!
-
 func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool) string {
 	if fileMapFromGlob == nil {
 		var err error

@@ -61,12 +61,12 @@ func (c *Config) GetCleanRootDir() string {
 
 type DevConfig struct {
 	// REQUIRED
-	HealthcheckURL    string
-	RefreshServerPort int
+	HealthcheckURL string
 
 	// OPTIONAL
 	MaxReadinessAttempts int
 	ReadinessSleepTime   time.Duration
+	RefreshServerPort    int
 
 	WatchedFiles WatchedFiles
 
