@@ -12,18 +12,21 @@ import (
 )
 
 func Dev(config *common.Config) {
-	common.SetKirunaEnvDev()
+	common.KirunaEnv.SetModeToDev()
 
 	var err error
 	if config.DevConfig.RefreshServerPort == 0 {
-		config.DevConfig.RefreshServerPort, err = util.GetFreePort()
+		freePort, err := util.GetFreePort()
 		if err != nil {
+			freePort = 51027 // just a "random" port that is likely to be free
 			fmt.Printf("error: failed to get free port: %v\n", err)
-			fmt.Printf("using default port number %d\n", 51027)
+			fmt.Printf("attempting to use default fallback port: %d\n", freePort)
 			fmt.Printf("to specify a different port for the sidecar dev refresh server, manually set DevConfig.RefreshServerPort in your config\n")
-			config.DevConfig.RefreshServerPort = 51027
-			return
+		} else {
+			common.KirunaEnv.SetRefreshServerPort(freePort)
 		}
+	} else {
+		common.KirunaEnv.SetRefreshServerPort(config.DevConfig.RefreshServerPort)
 	}
 
 	if config.DevConfig == nil {
@@ -39,7 +42,7 @@ func Dev(config *common.Config) {
 	if config.DevConfig.ServerOnly {
 		setupWatcher(nil, config)
 	} else {
-		util.Log.Infof("initializing sidecar refresh server on port number %d", config.DevConfig.RefreshServerPort)
+		util.Log.Infof("initializing sidecar refresh server on port %d", common.KirunaEnv.GetRefreshServerPort())
 
 		manager := NewClientManager()
 		go manager.start()
@@ -55,10 +58,10 @@ func Dev(config *common.Config) {
 		mux.HandleFunc("/get-refresh-script-inner", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "text/javascript")
-			w.Write([]byte(runtime.GetRefreshScriptInner(config.DevConfig.RefreshServerPort)))
+			w.Write([]byte(runtime.GetRefreshScriptInner(common.KirunaEnv.GetRefreshServerPort())))
 		})
 
-		if err := http.ListenAndServe(":"+strconv.Itoa(config.DevConfig.RefreshServerPort), mux); err != nil {
+		if err := http.ListenAndServe(":"+strconv.Itoa(common.KirunaEnv.GetRefreshServerPort()), mux); err != nil {
 			util.Log.Panicf("error: failed to start refresh server: %v", err)
 		}
 	}

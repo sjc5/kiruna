@@ -24,7 +24,7 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// DEV
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
-	if common.GetIsKirunaEnvDev() {
+	if common.KirunaEnv.GetIsDev() {
 		util.Log.Infof("using disk file system (development)")
 		universalFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
 		return universalFS, nil

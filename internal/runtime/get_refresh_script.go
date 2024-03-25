@@ -55,9 +55,9 @@ es.onmessage = (e) => {
 const RefreshDiv = `<div id="__refreshscript-rebuilding" style="display: none;">Rebuilding...</div>`
 
 func GetRefreshScript(config *common.Config) string {
-	if !common.GetIsKirunaEnvDev() {
+	if !common.KirunaEnv.GetIsDev() {
 		return ""
 	}
-	inner := GetRefreshScriptInner(config.DevConfig.RefreshServerPort)
+	inner := GetRefreshScriptInner(common.KirunaEnv.GetRefreshServerPort())
 	return RefreshDiv + "\n<script>\n" + inner + "\n</script>"
 }

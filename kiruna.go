@@ -69,7 +69,7 @@ func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) ht
 	return runtime.GetServeStaticHandler(k.Config, pathPrefix, cacheImmutably)
 }
 func (k Kiruna) GetIsDev() bool {
-	return common.GetIsKirunaEnvDev()
+	return common.KirunaEnv.GetIsDev()
 }
 
 func NewLogger(label string) util.Logger {
