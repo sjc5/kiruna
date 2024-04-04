@@ -10,7 +10,7 @@ import (
 
 func MakeRequisiteDirs(config *common.Config) error {
 	cleanRootDir := config.GetCleanRootDir()
-	if config.DevConfig.ServerOnly {
+	if config.DevConfig != nil && config.DevConfig.ServerOnly {
 		return nil
 	}
 	// make a dist/kiruna/internal directory
