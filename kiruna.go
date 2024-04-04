@@ -20,11 +20,11 @@ type Kiruna struct {
 	Config *common.Config
 }
 
-func (k Kiruna) Build() error {
-	return buildtime.Build(k.Config, true)
+func (k Kiruna) MustBuild() {
+	buildtime.MustBuild(k.Config, true)
 }
-func (k Kiruna) BuildWithoutCompilingGo() error {
-	return buildtime.Build(k.Config, false)
+func (k Kiruna) MustBuildWithoutCompilingGo() {
+	buildtime.MustBuild(k.Config, false)
 }
 func (k Kiruna) GetPublicFS() (*runtime.UniversalFS, error) {
 	return runtime.GetPublicFS(k.Config)
@@ -38,7 +38,8 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 func (k Kiruna) MakeRequisiteDirs() error {
 	return buildtime.MakeRequisiteDirs(k.Config)
 }
-func (k Kiruna) Dev() {
+func (k Kiruna) Dev(devConfig *common.DevConfig) {
+	k.Config.DevConfig = devConfig
 	dev.Dev(k.Config)
 }
 func (k Kiruna) GetCriticalCSS() template.CSS {
@@ -84,3 +85,8 @@ func New(config *common.Config) Kiruna {
 
 type WatchedFiles = common.WatchedFiles
 type OnChangeFunc = common.OnChangeFunc
+type OnChange = common.OnChange
+
+const OnChangeStrategyConcurrent = common.OnChangeStrategyConcurrent
+const OnChangeStrategyPost = common.OnChangeStrategyPost
+const OnChangeStrategyPre = common.OnChangeStrategyPre

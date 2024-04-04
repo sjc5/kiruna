@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/sjc5/kiruna/internal/common"
+	"github.com/sjc5/kiruna/internal/util"
 )
 
 func setupNewBuild(config *common.Config) error {
@@ -76,20 +77,31 @@ func (e PrecompileError) Error() string {
 	return fmt.Sprintf("error during precompile task %s: %v", e.task, e.err)
 }
 
-func Build(config *common.Config, recompileBinary bool) error {
+func MustSetupNewBuild(config *common.Config) {
 	err := setupNewBuild(config)
 	if err != nil {
-		return err
+		util.Log.Panicf("error: failed to setup new build: %v", err)
 	}
-	err = runPrecompileTasks(config)
+}
+
+func MustRunPrecompileTasks(config *common.Config) {
+	err := runPrecompileTasks(config)
 	if err != nil {
-		return err
+		util.Log.Panicf("error: failed to run precompile tasks: %v", err)
 	}
+}
+
+func MustRecompileBinary(config *common.Config) {
+	err := BuildApp(config)
+	if err != nil {
+		util.Log.Panicf("error: failed to recompile binary: %v", err)
+	}
+}
+
+func MustBuild(config *common.Config, recompileBinary bool) {
+	MustSetupNewBuild(config)
+	MustRunPrecompileTasks(config)
 	if recompileBinary {
-		err = BuildApp(config)
-		if err != nil {
-			return err
-		}
+		MustRecompileBinary(config)
 	}
-	return nil
 }

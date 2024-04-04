@@ -9,25 +9,32 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-var universalFS *UniversalFS
+var cachedUniFS *UniversalFS
+var fsType string
+
+const fsTypeDev = "dev"
 
 func GetUniversalDirFS(config *common.Config) (*UniversalFS, error) {
-	universalFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
-	return universalFS, nil
+	cachedUniFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+	return cachedUniFS, nil
 }
 
 func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
-	if universalFS != nil {
-		return universalFS, nil
+	if cachedUniFS != nil {
+		needsReset := common.KirunaEnv.GetIsDev() && fsType != fsTypeDev
+		if !needsReset {
+			return cachedUniFS, nil
+		}
 	}
 
 	// DEV
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
 	if common.KirunaEnv.GetIsDev() {
+		fsType = fsTypeDev
 		util.Log.Infof("using disk file system (development)")
-		universalFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
-		return universalFS, nil
+		cachedUniFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+		return cachedUniFS, nil
 	}
 
 	// PROD
@@ -39,14 +46,14 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 		if err != nil {
 			return nil, err
 		}
-		universalFS = newUniversalFS(FS)
-		return universalFS, nil
+		cachedUniFS = newUniversalFS(FS)
+		return cachedUniFS, nil
 	}
 
 	// PROD
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
 	util.Log.Infof("using disk file system (production)")
-	universalFS = newUniversalFS(os.DirFS(util.GetExecDir()))
-	return universalFS, nil
+	cachedUniFS = newUniversalFS(os.DirFS(util.GetExecDir()))
+	return cachedUniFS, nil
 }

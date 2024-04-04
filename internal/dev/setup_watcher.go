@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -27,7 +28,9 @@ func setupWatcher(manager *ClientManager, config *common.Config) {
 	}
 	done := make(chan bool)
 	go func() {
-		killBuildAndRestartAppDev(config)
+		killAppDev()
+		mustBuild(config)
+		startAppDev(config)
 		handleWatcherEmissions(config, manager, watcher)
 	}()
 	<-done
@@ -70,13 +73,82 @@ func handleWatcherEmissions(config *common.Config, manager *ClientManager, watch
 	}
 }
 
-func conditionallyRunOnChangeCallback(
-	wfc common.WatchedFile,
-	evt fsnotify.Event,
-) {
-	if wfc.OnChange != nil {
-		util.Log.Infof("running extension callback")
-		err := wfc.OnChange(evt.Name)
+type sortedOnChangeCallbacks struct {
+	stratPre        []common.OnChange
+	stratConcurrent []common.OnChange
+	stratPost       []common.OnChange
+	exists          bool
+}
+
+func sortOnChangeCallbacks(onChanges []common.OnChange) sortedOnChangeCallbacks {
+	stratPre := []common.OnChange{}
+	stratConcurrent := []common.OnChange{}
+	stratPost := []common.OnChange{}
+	exists := false
+	if len(onChanges) == 0 {
+		return sortedOnChangeCallbacks{}
+	} else {
+		exists = true
+	}
+	for _, o := range onChanges {
+		if o.Strategy == common.OnChangeStrategyPre || o.Strategy == "" {
+			stratPre = append(stratPre, o)
+		}
+		if o.Strategy == common.OnChangeStrategyConcurrent {
+			stratConcurrent = append(stratConcurrent, o)
+		}
+		if o.Strategy == common.OnChangeStrategyPost {
+			stratPost = append(stratPost, o)
+		}
+	}
+	return sortedOnChangeCallbacks{
+		stratPre:        stratPre,
+		stratConcurrent: stratConcurrent,
+		stratPost:       stratPost,
+		exists:          exists,
+	}
+}
+
+func getIsIgnored(evtName string, excludedFiles []string) bool {
+	isIgnored := false
+	if len(excludedFiles) > 0 {
+		for _, ignoreFile := range excludedFiles {
+			if strings.HasSuffix(evtName, ignoreFile) {
+				isIgnored = true
+				break
+			}
+		}
+	}
+	return isIgnored
+}
+
+func runConcurrentOnChangeCallbacks(sortedOnChanges *sortedOnChangeCallbacks, evtName string) {
+	if len(sortedOnChanges.stratConcurrent) > 0 {
+		wg := sync.WaitGroup{}
+		wg.Add(len(sortedOnChanges.stratConcurrent))
+		for _, o := range sortedOnChanges.stratConcurrent {
+			if getIsIgnored(evtName, o.ExcludedFiles) {
+				wg.Done()
+				continue
+			}
+			go func(o common.OnChange) {
+				defer wg.Done()
+				err := o.Func(evtName)
+				if err != nil {
+					util.Log.Errorf("error running extension callback: %v", err)
+				}
+			}(o)
+		}
+		wg.Wait()
+	}
+}
+
+func simpleRunOnChangeCallbacks(onChanges []common.OnChange, evtName string) {
+	for _, o := range onChanges {
+		if getIsIgnored(evtName, o.ExcludedFiles) {
+			continue
+		}
+		err := o.Func(evtName)
 		if err != nil {
 			util.Log.Errorf("error running extension callback: %v", err)
 		}
@@ -89,30 +161,54 @@ func handleGoFileChange(
 	evt fsnotify.Event,
 	evtDetails EvtDetails,
 ) {
+	killAppDev()
+
+	if !config.DevConfig.ServerOnly {
+		manager.broadcast <- RefreshFilePayload{
+			ChangeType: ChangeTypeRebuilding,
+		}
+	}
+
 	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
-	if config.DevConfig.ServerOnly {
-		conditionallyRunOnChangeCallback(wfc, evt)
-		util.Log.Infof("modified: %s, recompiling", evt.Name)
-		killBuildAndRestartAppDev(config)
-		return
+	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
+
+	if sortedOnChanges.exists {
+		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mustBuild(config)
+		}()
+
+		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
+		wg.Wait()
+	} else {
+		mustBuild(config)
 	}
-	manager.broadcast <- RefreshFilePayload{
-		ChangeType: ChangeTypeRebuilding,
+
+	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
+
+	startAppDev(config)
+
+	if !config.DevConfig.ServerOnly {
+		util.Log.Infof("hard reloading browser")
+		reloadBroadcast(
+			config,
+			manager,
+			RefreshFilePayload{
+				ChangeType: ChangeTypeOther,
+			},
+		)
 	}
-	conditionallyRunOnChangeCallback(wfc, evt)
-	util.Log.Infof("modified: %s, needs a full recompile", evt.Name)
-	killBuildAndRestartAppDev(config)
-	if config.DevConfig.ServerOnly {
-		return
+}
+
+func mustProcessCSS(config *common.Config, cssType ChangeType) {
+	err := buildtime.ProcessCSS(config, string(cssType))
+	if err != nil {
+		util.Log.Panicf("error processing %s CSS: %v", cssType, err)
 	}
-	util.Log.Infof("hard reloading browser")
-	reloadBroadcast(
-		config,
-		manager,
-		RefreshFilePayload{
-			ChangeType: ChangeTypeOther,
-		},
-	)
 }
 
 func handleCSSFileChange(
@@ -121,25 +217,21 @@ func handleCSSFileChange(
 	evt fsnotify.Event,
 	cssType ChangeType,
 ) {
-	if config.DevConfig.CSSConfig.OnChange != nil {
-		isIgnored := false
-		for _, ignoreFile := range config.DevConfig.CSSConfig.OnChangeExcludedFiles {
-			if strings.HasSuffix(evt.Name, ignoreFile) {
-				isIgnored = true
-				break
-			}
-		}
-		if !isIgnored {
-			util.Log.Infof("running css callback")
-			err := config.DevConfig.CSSConfig.OnChange(evt.Name)
-			if err != nil {
-				util.Log.Errorf("error running extension callback: %v", err)
-			}
-		}
-	}
-	err := buildtime.ProcessCSS(config, string(cssType))
-	if err != nil {
-		util.Log.Panicf("error processing %s CSS: %v", cssType, err)
+	sortedOnChanges := sortOnChangeCallbacks(config.DevConfig.CSSConfig.OnChangeCallbacks)
+	if sortedOnChanges.exists {
+		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mustProcessCSS(config, cssType)
+		}()
+
+		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
+		wg.Wait()
+	} else {
+		mustProcessCSS(config, cssType)
 	}
 	util.Log.Infof("modified: %s", evt.Name)
 	util.Log.Infof("hot reloading browser")
@@ -158,37 +250,63 @@ func handleCSSFileChange(
 
 func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails) {
 	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
+
+	if wfc.RecompileBinary || wfc.RestartApp {
+		util.Log.Infof("killing running app")
+		killAppDev()
+	}
+
 	if !wfc.SkipRebuildingNotification {
 		manager.broadcast <- RefreshFilePayload{
 			ChangeType: ChangeTypeRebuilding,
 		}
 		util.Log.Infof("modified: %s, rebuilding static assets", evt.Name)
 	}
-	conditionallyRunOnChangeCallback(wfc, evt)
-	if wfc.RunOnChangeOnly {
+	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
+
+	if sortedOnChanges.exists {
+		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+
 		// You would do this if you want to trigger a process that itself
 		// saves to a file (evt.g., to styles/critical/whatever.css) that
 		// would in turn trigger the rebuild in another run
-		util.Log.Infof("onchange complete, work is done")
-		return
+		if wfc.RunOnChangeOnly {
+			util.Log.Infof("onchange complete, work is done")
+			return
+		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// This is different than inside of handleGoFileChange, because here we
+			// assume we need to re-run other build steps too, not just recompile Go.
+			// Also, we don't necessarily recompile Go here (we only necessarily) run
+			// the other build steps. We only recompile Go if wfc.RecompileBinary is true.
+			buildtime.MustSetupNewBuild(config)
+			buildtime.MustRunPrecompileTasks(config)
+			if wfc.RecompileBinary {
+				buildtime.MustRecompileBinary(config)
+			}
+		}()
+
+		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
+		wg.Wait()
+	} else {
+		buildtime.MustSetupNewBuild(config)
+		buildtime.MustRunPrecompileTasks(config)
+		if wfc.RecompileBinary {
+			buildtime.MustRecompileBinary(config)
+		}
 	}
+
 	if wfc.RecompileBinary {
 		util.Log.Infof("doing a full recompile")
 	} else {
 		util.Log.Infof("skipping full recompile")
 	}
-	if wfc.RecompileBinary || wfc.RestartApp {
-		util.Log.Infof("killing running app")
-		killAppDev()
-	}
-	// This is different than inside of handleGoFileChange, because here we
-	// assume we need to re-run other build steps too, not just recompile Go.
-	// Also, we don't necessarily recompile Go here (we only necessarily) run
-	// the other build steps. We only recompile Go if wfc.RecompileBinary is true.
-	err := buildtime.Build(config, wfc.RecompileBinary)
-	if err != nil {
-		util.Log.Panicf("error building app: %v", err)
-	}
+
 	if wfc.RecompileBinary || wfc.RestartApp {
 		util.Log.Infof("restarting app")
 		startAppDev(config)
@@ -201,7 +319,6 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 			ChangeType: ChangeTypeOther,
 		},
 	)
-
 }
 
 func reloadBroadcast(config *common.Config, manager *ClientManager, rfp RefreshFilePayload) {

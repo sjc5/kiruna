@@ -14,7 +14,6 @@ import (
 func Dev(config *common.Config) {
 	common.KirunaEnv.SetModeToDev()
 
-	var err error
 	if config.DevConfig.RefreshServerPort == 0 {
 		freePort, err := util.GetFreePort()
 		if err != nil {
@@ -34,10 +33,7 @@ func Dev(config *common.Config) {
 		return
 	}
 
-	err = buildtime.Build(config, false)
-	if err != nil {
-		util.Log.Panicf("error: build process failed: %v", err)
-	}
+	buildtime.MustBuild(config, false)
 
 	if config.DevConfig.ServerOnly {
 		setupWatcher(nil, config)

@@ -83,18 +83,27 @@ type DevConfig struct {
 	CSSConfig CSSConfig
 }
 
+const OnChangeStrategyPre = "pre"
+const OnChangeStrategyPost = "post"
+const OnChangeStrategyConcurrent = "concurrent"
+
 type OnChangeFunc func(string) error
 
+type OnChange struct {
+	Strategy      string
+	Func          OnChangeFunc
+	ExcludedFiles []string
+}
+
 type CSSConfig struct {
-	OnChange              OnChangeFunc
-	OnChangeExcludedFiles []string
+	OnChangeCallbacks []OnChange
 }
 
 type WatchedFile struct {
 	// OnChange runs before any Kiruna processing, except that as long as "SkipRebuildingNotification"
 	// is false (default), Kiruna will send a signal to the browser to show the
 	// "Rebuilding..." status message first.
-	OnChange OnChangeFunc
+	OnChangeCallbacks []OnChange
 
 	// Use this if you need the binary recompiled before the browser is reloaded
 	RecompileBinary bool

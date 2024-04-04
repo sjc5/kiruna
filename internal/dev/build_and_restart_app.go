@@ -12,13 +12,11 @@ import (
 
 var lastBuildCmd *exec.Cmd
 
-func killBuildAndRestartAppDev(config *common.Config) {
-	killAppDev()
+func mustBuild(config *common.Config) {
 	err := buildtime.BuildApp(config)
 	if err != nil {
-		return
+		util.Log.Panicf("error: failed to build app: %v", err)
 	}
-	startAppDev(config)
 }
 
 func killAppDev() {
