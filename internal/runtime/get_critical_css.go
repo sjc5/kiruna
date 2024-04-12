@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"strings"
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
 )
 
 const CriticalCSSElementID = "__critical-css"
+
+// __TODO cache this?
 
 func GetCriticalCSS(config *common.Config) string {
 	FS, err := GetUniversalFS(config)
@@ -19,7 +22,9 @@ func GetCriticalCSS(config *common.Config) string {
 	}
 	content, err := FS.ReadFile(filepath.Join("kiruna", "internal", "critical.css"))
 	if err != nil {
-		util.Log.Errorf("error reading critical CSS: %v", err)
+		if !strings.HasSuffix(err.Error(), "no such file or directory") {
+			util.Log.Errorf("error reading critical CSS: %v", err)
+		}
 		return ""
 	}
 	return string(content)
