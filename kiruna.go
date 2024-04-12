@@ -83,6 +83,7 @@ func New(config *common.Config) Kiruna {
 	}
 }
 
+type WatchedFile = common.WatchedFile
 type WatchedFiles = common.WatchedFiles
 type OnChangeFunc = common.OnChangeFunc
 type OnChange = common.OnChange
