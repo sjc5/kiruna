@@ -1,6 +1,7 @@
 package buildtime
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,8 +25,7 @@ func CompileBinary(config *common.Config) error {
 	buildCmd.Stderr = os.Stderr
 	err := buildCmd.Run()
 	if err != nil {
-		util.Log.Errorf("error compiling binary: %v", err)
-		return err
+		return fmt.Errorf("error compiling binary: %v", err)
 	}
 	util.Log.Infof("compilation complete: %s", buildDest)
 	return nil

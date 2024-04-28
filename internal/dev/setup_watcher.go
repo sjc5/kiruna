@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -397,7 +398,7 @@ func isDirOrChildOfDir(dir string, parent string) bool {
 func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) error {
 	return filepath.Walk(path, func(walkedPath string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("error walking path: %v", err)
 		}
 		if info.IsDir() {
 			for _, ignoreDir := range append(getStandardIgnoreDirList(config), config.DevConfig.IgnoreDirs...) {
@@ -408,7 +409,7 @@ func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) erro
 			}
 			err := watcher.Add(walkedPath)
 			if err != nil {
-				return err
+				return fmt.Errorf("error adding directory to watcher: %v", err)
 			}
 		}
 		return nil

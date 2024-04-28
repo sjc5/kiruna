@@ -1,6 +1,7 @@
 package buildtime
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,18 +20,18 @@ func handlePublicFiles(cleanRootDir string) error {
 
 	err := filepath.WalkDir(publicDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("error walking public dir: %v", err)
 		}
 		if d.IsDir() {
 			return nil
 		}
 		relativePath, err := filepath.Rel(publicDir, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("error getting relative path: %v", err)
 		}
 		contentBytes, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return fmt.Errorf("error reading file: %v", err)
 		}
 
 		// normalize
@@ -51,7 +52,7 @@ func handlePublicFiles(cleanRootDir string) error {
 			distPath := filepath.Join(cleanRootDir, "dist", "kiruna", "static", "public", hashed)
 			err = os.WriteFile(distPath, contentBytes, 0644)
 			if err != nil {
-				return err
+				return fmt.Errorf("error writing file: %v", err)
 			}
 		} else {
 			// Actually copy the files over
@@ -59,24 +60,19 @@ func handlePublicFiles(cleanRootDir string) error {
 			// Make sure the directory exists
 			err = os.MkdirAll(filepath.Dir(distPath), 0755)
 			if err != nil {
-				return err
+				return fmt.Errorf("error creating directory: %v", err)
 			}
 			err = os.WriteFile(distPath, contentBytes, 0644)
 			if err != nil {
-				return err
+				return fmt.Errorf("error writing file: %v", err)
 			}
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error walking public dir: %v", err)
 	}
 
-	err = saveMapToGob(cleanRootDir, publicFileMap, common.PublicFileMapGobName)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return saveMapToGob(cleanRootDir, publicFileMap, common.PublicFileMapGobName)
 }
