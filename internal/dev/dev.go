@@ -11,7 +11,7 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-func Dev(config *common.Config) {
+func MustStartDev(config *common.Config) {
 	common.KirunaEnv.SetModeToDev()
 
 	if config.DevConfig.RefreshServerPort == 0 {
@@ -33,16 +33,20 @@ func Dev(config *common.Config) {
 		return
 	}
 
-	buildtime.MustBuild(config, false)
+	err := buildtime.Build(config, false)
+	if err != nil {
+		util.Log.Panicf("error: failed to build app: %v", err)
+		return
+	}
 
 	if config.DevConfig.ServerOnly {
-		setupWatcher(nil, config)
+		mustSetupWatcher(nil, config)
 	} else {
 		util.Log.Infof("initializing sidecar refresh server on port %d", common.KirunaEnv.GetRefreshServerPort())
 
 		manager := NewClientManager()
 		go manager.start()
-		go setupWatcher(manager, config)
+		go mustSetupWatcher(manager, config)
 
 		mux := http.NewServeMux()
 

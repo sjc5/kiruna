@@ -5,29 +5,25 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/sjc5/kiruna/internal/buildtime"
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
 )
 
 var lastBuildCmd *exec.Cmd
 
-func mustBuild(config *common.Config) {
-	err := buildtime.BuildApp(config)
-	if err != nil {
-		util.Log.Panicf("error: failed to build app: %v", err)
-	}
-}
-
-func killAppDev() {
+func mustKillAppDev() {
 	if lastBuildCmd != nil {
 		if err := lastBuildCmd.Process.Kill(); err != nil {
-			util.Log.Panicf("error: failed to kill running app: %v", err)
+			util.Log.Panicf(
+				"error: failed to kill running app with pid %d: %v",
+				lastBuildCmd.Process.Pid,
+				err,
+			)
 		}
 	}
 }
 
-func startAppDev(config *common.Config) {
+func mustStartAppDev(config *common.Config) {
 	if config.BinOutputFilename == "" {
 		config.BinOutputFilename = "main"
 	}

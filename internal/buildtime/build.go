@@ -7,10 +7,9 @@ import (
 	"sync"
 
 	"github.com/sjc5/kiruna/internal/common"
-	"github.com/sjc5/kiruna/internal/util"
 )
 
-func setupNewBuild(config *common.Config) error {
+func SetupNewBuild(config *common.Config) error {
 	cleanRootDir := config.GetCleanRootDir()
 	// nuke the dist/kiruna directory
 	err := os.RemoveAll(filepath.Join(cleanRootDir, "dist", "kiruna"))
@@ -25,7 +24,7 @@ func setupNewBuild(config *common.Config) error {
 	return nil
 }
 
-func runPrecompileTasks(config *common.Config) error {
+func RunPrecompileTasks(config *common.Config) error {
 	cleanRootDir := config.GetCleanRootDir()
 
 	// Must be complete before BuildCSS in case the CSS references any public files
@@ -77,31 +76,20 @@ func (e PrecompileError) Error() string {
 	return fmt.Sprintf("error during precompile task %s: %v", e.task, e.err)
 }
 
-func MustSetupNewBuild(config *common.Config) {
-	err := setupNewBuild(config)
+func Build(config *common.Config, recompileBinary bool) error {
+	err := SetupNewBuild(config)
 	if err != nil {
-		util.Log.Panicf("error: failed to setup new build: %v", err)
+		return err
 	}
-}
-
-func MustRunPrecompileTasks(config *common.Config) {
-	err := runPrecompileTasks(config)
+	err = RunPrecompileTasks(config)
 	if err != nil {
-		util.Log.Panicf("error: failed to run precompile tasks: %v", err)
+		return err
 	}
-}
-
-func MustRecompileBinary(config *common.Config) {
-	err := BuildApp(config)
-	if err != nil {
-		util.Log.Panicf("error: failed to recompile binary: %v", err)
-	}
-}
-
-func MustBuild(config *common.Config, recompileBinary bool) {
-	MustSetupNewBuild(config)
-	MustRunPrecompileTasks(config)
 	if recompileBinary {
-		MustRecompileBinary(config)
+		err = CompileBinary(config)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
