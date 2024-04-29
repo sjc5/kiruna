@@ -20,11 +20,11 @@ type Kiruna struct {
 	Config *common.Config
 }
 
-func (k Kiruna) MustBuild() {
-	buildtime.MustBuild(k.Config, true)
+func (k Kiruna) Build() error {
+	return buildtime.Build(k.Config, true)
 }
-func (k Kiruna) MustBuildWithoutCompilingGo() {
-	buildtime.MustBuild(k.Config, false)
+func (k Kiruna) BuildWithoutCompilingGo() error {
+	return buildtime.Build(k.Config, false)
 }
 func (k Kiruna) GetPublicFS() (*runtime.UniversalFS, error) {
 	return runtime.GetPublicFS(k.Config)
@@ -38,9 +38,9 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 func (k Kiruna) MakeRequisiteDirs() error {
 	return buildtime.MakeRequisiteDirs(k.Config)
 }
-func (k Kiruna) Dev(devConfig *common.DevConfig) {
+func (k Kiruna) MustStartDev(devConfig *common.DevConfig) {
 	k.Config.DevConfig = devConfig
-	dev.Dev(k.Config)
+	dev.MustStartDev(k.Config)
 }
 func (k Kiruna) GetCriticalCSS() template.CSS {
 	return template.CSS(runtime.GetCriticalCSS(k.Config))

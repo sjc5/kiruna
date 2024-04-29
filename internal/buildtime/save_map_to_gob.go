@@ -2,6 +2,7 @@ package buildtime
 
 import (
 	"encoding/gob"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -9,10 +10,9 @@ import (
 func saveMapToGob(cleanRootDir string, mapToSave map[string]string, dest string) error {
 	file, err := os.Create(filepath.Join(cleanRootDir, "dist", "kiruna", "internal", dest))
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating file: %v", err)
 	}
 	defer file.Close()
 	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(mapToSave)
-	return err
+	return encoder.Encode(mapToSave)
 }

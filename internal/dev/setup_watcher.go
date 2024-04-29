@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,8 +15,8 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-func setupWatcher(manager *ClientManager, config *common.Config) {
-	defer killAppDev()
+func mustSetupWatcher(manager *ClientManager, config *common.Config) {
+	defer mustKillAppDev()
 	setupExtKeys(config)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -28,15 +29,18 @@ func setupWatcher(manager *ClientManager, config *common.Config) {
 	}
 	done := make(chan bool)
 	go func() {
-		killAppDev()
-		mustBuild(config)
-		startAppDev(config)
-		handleWatcherEmissions(config, manager, watcher)
+		mustKillAppDev()
+		err := buildtime.CompileBinary(config)
+		if err != nil {
+			util.Log.Errorf("error: failed to build app: %v", err)
+		}
+		mustStartAppDev(config)
+		mustHandleWatcherEmissions(config, manager, watcher)
 	}()
 	<-done
 }
 
-func handleWatcherEmissions(config *common.Config, manager *ClientManager, watcher *fsnotify.Watcher) {
+func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, watcher *fsnotify.Watcher) {
 	for {
 		select {
 		case evt := <-watcher.Events:
@@ -44,15 +48,15 @@ func handleWatcherEmissions(config *common.Config, manager *ClientManager, watch
 			if getIsModifyEvt(evt) {
 				evtDetails := getEvtDetails(config, evt)
 				if getIsGo(evt) {
-					handleGoFileChange(config, manager, evt, evtDetails)
+					mustHandleGoFileChange(config, manager, evt, evtDetails)
 				} else {
 					if !config.DevConfig.ServerOnly {
 						if evtDetails.isCriticalCss {
-							handleCSSFileChange(config, manager, evt, ChangeTypeCriticalCSS)
+							mustHandleCSSFileChange(config, manager, evt, ChangeTypeCriticalCSS)
 						} else if evtDetails.isNormalCss {
-							handleCSSFileChange(config, manager, evt, ChangeTypeNormalCSS)
+							mustHandleCSSFileChange(config, manager, evt, ChangeTypeNormalCSS)
 						} else if evtDetails.shouldReload {
-							handleOtherFileChange(config, manager, evt, evtDetails)
+							mustHandleOtherFileChange(config, manager, evt, evtDetails)
 						}
 					}
 				}
@@ -155,14 +159,12 @@ func simpleRunOnChangeCallbacks(onChanges []common.OnChange, evtName string) {
 	}
 }
 
-func handleGoFileChange(
+func mustHandleGoFileChange(
 	config *common.Config,
 	manager *ClientManager,
 	evt fsnotify.Event,
 	evtDetails EvtDetails,
 ) {
-	killAppDev()
-
 	if !config.DevConfig.ServerOnly {
 		manager.broadcast <- RefreshFilePayload{
 			ChangeType: ChangeTypeRebuilding,
@@ -172,6 +174,8 @@ func handleGoFileChange(
 	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
 	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
 
+	var buildErr error
+
 	if sortedOnChanges.exists {
 		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
 
@@ -179,22 +183,27 @@ func handleGoFileChange(
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mustBuild(config)
+			buildErr = buildtime.CompileBinary(config)
 		}()
 
 		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
 		wg.Wait()
 	} else {
-		mustBuild(config)
+		buildErr = buildtime.CompileBinary(config)
+	}
+
+	if buildErr != nil {
+		util.Log.Errorf("error: failed to build app: %v", buildErr)
+		return
 	}
 
 	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
 
-	startAppDev(config)
+	mustKillAndRestart(config)
 
 	if !config.DevConfig.ServerOnly {
 		util.Log.Infof("hard reloading browser")
-		reloadBroadcast(
+		mustReloadBroadcast(
 			config,
 			manager,
 			RefreshFilePayload{
@@ -204,19 +213,19 @@ func handleGoFileChange(
 	}
 }
 
-func mustProcessCSS(config *common.Config, cssType ChangeType) {
-	err := buildtime.ProcessCSS(config, string(cssType))
-	if err != nil {
-		util.Log.Panicf("error processing %s CSS: %v", cssType, err)
-	}
+func mustKillAndRestart(config *common.Config) {
+	util.Log.Infof("killing and restarting app")
+	mustKillAppDev()
+	mustStartAppDev(config)
 }
 
-func handleCSSFileChange(
+func mustHandleCSSFileChange(
 	config *common.Config,
 	manager *ClientManager,
 	evt fsnotify.Event,
 	cssType ChangeType,
 ) {
+	var cssBuildErr error
 	sortedOnChanges := sortOnChangeCallbacks(config.DevConfig.CSSConfig.OnChangeCallbacks)
 	if sortedOnChanges.exists {
 		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
@@ -225,17 +234,23 @@ func handleCSSFileChange(
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			mustProcessCSS(config, cssType)
+			cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
 		}()
 
 		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
 		wg.Wait()
 	} else {
-		mustProcessCSS(config, cssType)
+		cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
 	}
+
+	if cssBuildErr != nil {
+		util.Log.Errorf("error: failed to process %s CSS: %v", cssType, cssBuildErr)
+		return
+	}
+
 	util.Log.Infof("modified: %s", evt.Name)
 	util.Log.Infof("hot reloading browser")
-	reloadBroadcast(
+	mustReloadBroadcast(
 		config,
 		manager,
 		RefreshFilePayload{
@@ -248,13 +263,8 @@ func handleCSSFileChange(
 	)
 }
 
-func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails) {
+func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails) {
 	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
-
-	if wfc.RecompileBinary || wfc.RestartApp {
-		util.Log.Infof("killing running app")
-		killAppDev()
-	}
 
 	if !wfc.SkipRebuildingNotification {
 		manager.broadcast <- RefreshFilePayload{
@@ -265,6 +275,7 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
 
 	if sortedOnChanges.exists {
+		var buildErr error
 		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
 
 		// You would do this if you want to trigger a process that itself
@@ -284,20 +295,45 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 			// assume we need to re-run other build steps too, not just recompile Go.
 			// Also, we don't necessarily recompile Go here (we only necessarily) run
 			// the other build steps. We only recompile Go if wfc.RecompileBinary is true.
-			buildtime.MustSetupNewBuild(config)
-			buildtime.MustRunPrecompileTasks(config)
+			buildErr = buildtime.SetupNewBuild(config)
+			if buildErr != nil {
+				util.Log.Errorf("error: failed to setup new build: %v", buildErr)
+				return
+			}
+			buildErr = buildtime.RunPrecompileTasks(config)
+			if buildErr != nil {
+				util.Log.Errorf("error: failed to run precompile tasks: %v", buildErr)
+				return
+			}
 			if wfc.RecompileBinary {
-				buildtime.MustRecompileBinary(config)
+				buildErr = buildtime.CompileBinary(config)
+				if buildErr != nil {
+					util.Log.Errorf("error: failed to recompile binary: %v", buildErr)
+					return
+				}
 			}
 		}()
 
 		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
 		wg.Wait()
 	} else {
-		buildtime.MustSetupNewBuild(config)
-		buildtime.MustRunPrecompileTasks(config)
+		var buildErr error
+		buildErr = buildtime.SetupNewBuild(config)
+		if buildErr != nil {
+			util.Log.Errorf("error: failed to setup new build: %v", buildErr)
+			return
+		}
+		buildErr = buildtime.RunPrecompileTasks(config)
+		if buildErr != nil {
+			util.Log.Errorf("error: failed to run precompile tasks: %v", buildErr)
+			return
+		}
 		if wfc.RecompileBinary {
-			buildtime.MustRecompileBinary(config)
+			buildErr = buildtime.CompileBinary(config)
+			if buildErr != nil {
+				util.Log.Errorf("error: failed to recompile binary: %v", buildErr)
+				return
+			}
 		}
 	}
 
@@ -308,11 +344,11 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 	}
 
 	if wfc.RecompileBinary || wfc.RestartApp {
-		util.Log.Infof("restarting app")
-		startAppDev(config)
+		mustKillAndRestart(config)
 	}
+
 	util.Log.Infof("hard reloading browser")
-	reloadBroadcast(
+	mustReloadBroadcast(
 		config,
 		manager,
 		RefreshFilePayload{
@@ -321,7 +357,7 @@ func handleOtherFileChange(config *common.Config, manager *ClientManager, evt fs
 	)
 }
 
-func reloadBroadcast(config *common.Config, manager *ClientManager, rfp RefreshFilePayload) {
+func mustReloadBroadcast(config *common.Config, manager *ClientManager, rfp RefreshFilePayload) {
 	if waitForAppReadiness(config) {
 		manager.broadcast <- rfp
 		return
@@ -362,7 +398,7 @@ func isDirOrChildOfDir(dir string, parent string) bool {
 func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) error {
 	return filepath.Walk(path, func(walkedPath string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("error walking path: %v", err)
 		}
 		if info.IsDir() {
 			for _, ignoreDir := range append(getStandardIgnoreDirList(config), config.DevConfig.IgnoreDirs...) {
@@ -373,7 +409,7 @@ func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) erro
 			}
 			err := watcher.Add(walkedPath)
 			if err != nil {
-				return err
+				return fmt.Errorf("error adding directory to watcher: %v", err)
 			}
 		}
 		return nil

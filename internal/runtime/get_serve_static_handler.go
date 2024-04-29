@@ -10,7 +10,7 @@ import (
 func GetServeStaticHandler(config *common.Config, pathPrefix string, cacheImmutably bool) http.Handler {
 	FS, err := GetPublicFS(config)
 	if err != nil {
-		util.Log.Panicf("error getting public FS: %v", err)
+		util.Log.Errorf("error getting public FS: %v", err)
 	}
 	if cacheImmutably {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

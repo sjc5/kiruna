@@ -25,8 +25,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 	}
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
-		util.Log.Errorf("error reading directory: %v", err)
-		return err
+		return fmt.Errorf("error reading directory: %v", err)
 	}
 
 	var concatenatedCSS strings.Builder
@@ -44,8 +43,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 	for _, fileName := range fileNames {
 		content, err := os.ReadFile(filepath.Join(dirPath, fileName))
 		if err != nil {
-			util.Log.Errorf("error reading file: %v", err)
-			return err
+			return fmt.Errorf("error reading file: %v", err)
 		}
 		concatenatedCSS.Write(content)
 	}
@@ -79,13 +77,11 @@ func ProcessCSS(config *common.Config, subDir string) error {
 		oldNormalPath := filepath.Join(outputPath, "normal_*.css")
 		oldNormalFiles, err := filepath.Glob(oldNormalPath)
 		if err != nil {
-			util.Log.Errorf("error finding old normal CSS files: %v", err)
-			return err
+			return fmt.Errorf("error finding old normal CSS files: %v", err)
 		}
 		for _, oldNormalFile := range oldNormalFiles {
 			if err := os.Remove(oldNormalFile); err != nil {
-				util.Log.Errorf("error removing old normal CSS file: %v", err)
-				return err
+				return fmt.Errorf("error removing old normal CSS file: %v", err)
 			}
 		}
 
@@ -98,8 +94,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 
 	// Ensure output directory exists
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
-		util.Log.Errorf("error creating output directory: %v", err)
-		return err
+		return fmt.Errorf("error creating output directory: %v", err)
 	}
 
 	// Write concatenated content to file
@@ -109,8 +104,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 	if subDir == "normal" {
 		hashFile := filepath.Join(cleanRootDir, "dist", "kiruna", "internal", "normal_css_file_ref.txt")
 		if err := os.WriteFile(hashFile, []byte(outputFileName), 0644); err != nil {
-			util.Log.Errorf("error writing to file: %v", err)
-			return err
+			return fmt.Errorf("error writing to file: %v", err)
 		}
 	}
 
@@ -118,12 +112,7 @@ func ProcessCSS(config *common.Config, subDir string) error {
 		concatenatedCSSString = naiveCSSMinify(concatenatedCSS.String())
 	}
 
-	if err := os.WriteFile(outputFile, []byte(concatenatedCSSString), 0644); err != nil {
-		util.Log.Errorf("error writing to file: %v", err)
-		return err
-	}
-
-	return nil
+	return os.WriteFile(outputFile, []byte(concatenatedCSSString), 0644)
 }
 
 func naiveCSSMinify(content string) string {

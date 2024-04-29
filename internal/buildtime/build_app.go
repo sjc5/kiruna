@@ -1,6 +1,7 @@
 package buildtime
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 // If you want to do a custom build command, just use
 // Kiruna.BuildWithoutCompilingGo() instead of Kiruna.Build(),
 // and then you can control your build yourself afterwards.
-func BuildApp(config *common.Config) error {
+func CompileBinary(config *common.Config) error {
 	cleanRootDir := config.GetCleanRootDir()
 	if config.BinOutputFilename == "" {
 		config.BinOutputFilename = "main"
@@ -24,8 +25,7 @@ func BuildApp(config *common.Config) error {
 	buildCmd.Stderr = os.Stderr
 	err := buildCmd.Run()
 	if err != nil {
-		util.Log.Errorf("error building app: %v", err)
-		return err
+		return fmt.Errorf("error compiling binary: %v", err)
 	}
 	util.Log.Infof("compilation complete: %s", buildDest)
 	return nil
