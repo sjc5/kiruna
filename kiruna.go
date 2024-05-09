@@ -8,7 +8,6 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/dev"
 	"github.com/sjc5/kiruna/internal/runtime"
-	"github.com/sjc5/kiruna/internal/util"
 )
 
 type Config = common.Config
@@ -71,10 +70,6 @@ func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) ht
 }
 func (k Kiruna) GetIsDev() bool {
 	return common.KirunaEnv.GetIsDev()
-}
-
-func NewLogger(label string) util.Logger {
-	return util.NewColorLogger(label)
 }
 
 func New(config *common.Config) Kiruna {

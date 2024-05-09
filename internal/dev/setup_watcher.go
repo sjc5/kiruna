@@ -20,12 +20,16 @@ func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 	setupExtKeys(config)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		util.Log.Panicf("error: failed to create watcher: %v", err)
+		errMsg := fmt.Sprintf("error: failed to create watcher: %v", err)
+		util.Log.Error(errMsg)
+		panic(errMsg)
 	}
 	defer watcher.Close()
 	err = addDirs(config, watcher, config.GetCleanRootDir())
 	if err != nil {
-		util.Log.Panicf("error: failed to add directories to watcher: %v", err)
+		errMsg := fmt.Sprintf("error: failed to add directories to watcher: %v", err)
+		util.Log.Error(errMsg)
+		panic(errMsg)
 	}
 	done := make(chan bool)
 	go func() {
@@ -362,7 +366,9 @@ func mustReloadBroadcast(config *common.Config, manager *ClientManager, rfp Refr
 		manager.broadcast <- rfp
 		return
 	}
-	util.Log.Panicf("error: app never became ready: %v", rfp.ChangeType)
+	errMsg := fmt.Sprintf("error: app never became ready: %v", rfp.ChangeType)
+	util.Log.Error(errMsg)
+	panic(errMsg)
 }
 
 var extKeys []string = nil

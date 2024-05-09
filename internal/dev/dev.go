@@ -29,14 +29,16 @@ func MustStartDev(config *common.Config) {
 	}
 
 	if config.DevConfig == nil {
-		util.Log.Panicf("error: no dev config found")
-		return
+		errMsg := "error: no dev config found"
+		util.Log.Error(errMsg)
+		panic(errMsg)
 	}
 
 	err := buildtime.Build(config, false)
 	if err != nil {
-		util.Log.Panicf("error: failed to build app: %v", err)
-		return
+		errMsg := fmt.Sprintf("error: failed to build app: %v", err)
+		util.Log.Error(errMsg)
+		panic(errMsg)
 	}
 
 	if config.DevConfig.ServerOnly {
@@ -62,7 +64,9 @@ func MustStartDev(config *common.Config) {
 		})
 
 		if err := http.ListenAndServe(":"+strconv.Itoa(common.KirunaEnv.GetRefreshServerPort()), mux); err != nil {
-			util.Log.Panicf("error: failed to start refresh server: %v", err)
+			errMsg := fmt.Sprintf("error: failed to start refresh server: %v", err)
+			util.Log.Error(errMsg)
+			panic(errMsg)
 		}
 	}
 }
