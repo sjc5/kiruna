@@ -70,6 +70,8 @@ type DevConfig struct {
 
 	WatchedFiles WatchedFiles
 
+	// __TODO -- glob for ignore list? so supports dirs and files?
+
 	// Directories to ignore when watching for changes
 	// Should be set relative to the RootDir
 	// Default ignored list is "dist" relative to RootDir,

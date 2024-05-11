@@ -49,22 +49,8 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 		select {
 		case evt := <-watcher.Events:
 			time.Sleep(10 * time.Millisecond) // let the file system settle
-			if getIsModifyEvt(evt) {
-				evtDetails := getEvtDetails(config, evt)
-				if getIsGo(evt) {
-					mustHandleGoFileChange(config, manager, evt, evtDetails)
-				} else {
-					if !config.DevConfig.ServerOnly {
-						if evtDetails.isCriticalCss {
-							mustHandleCSSFileChange(config, manager, evt, ChangeTypeCriticalCSS)
-						} else if evtDetails.isNormalCss {
-							mustHandleCSSFileChange(config, manager, evt, ChangeTypeNormalCSS)
-						} else if evtDetails.shouldReload {
-							mustHandleOtherFileChange(config, manager, evt, evtDetails)
-						}
-					}
-				}
-			} else if evt.Has(fsnotify.Create) {
+
+			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
 				fileInfo, err := os.Stat(evt.Name)
 				if err == nil && fileInfo.IsDir() {
 					err := addDirs(config, watcher, evt.Name)
@@ -74,7 +60,22 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 					}
 				}
 			}
-			// Only other option is CHMOD, which we don't care about
+
+			evtDetails := getEvtDetails(config, evt)
+			if getIsGo(evt) {
+				mustHandleGoFileChange(config, manager, evt, evtDetails)
+			} else {
+				if !config.DevConfig.ServerOnly {
+					if evtDetails.isCriticalCss {
+						mustHandleCSSFileChange(config, manager, evt, ChangeTypeCriticalCSS)
+					} else if evtDetails.isNormalCss {
+						mustHandleCSSFileChange(config, manager, evt, ChangeTypeNormalCSS)
+					} else if evtDetails.shouldReload {
+						mustHandleOtherFileChange(config, manager, evt, evtDetails)
+					}
+				}
+			}
+
 		case err := <-watcher.Errors:
 			util.Log.Errorf("watcher error: %v", err)
 		}
@@ -169,6 +170,10 @@ func mustHandleGoFileChange(
 	evt fsnotify.Event,
 	evtDetails EvtDetails,
 ) {
+	if getIsNonEmptyCHMODOnly(evt) {
+		return
+	}
+
 	if !config.DevConfig.ServerOnly {
 		manager.broadcast <- RefreshFilePayload{
 			ChangeType: ChangeTypeRebuilding,
@@ -229,6 +234,10 @@ func mustHandleCSSFileChange(
 	evt fsnotify.Event,
 	cssType ChangeType,
 ) {
+	if getIsNonEmptyCHMODOnly(evt) {
+		return
+	}
+
 	var cssBuildErr error
 	sortedOnChanges := sortOnChangeCallbacks(config.DevConfig.CSSConfig.OnChangeCallbacks)
 	if sortedOnChanges.exists {
@@ -268,6 +277,10 @@ func mustHandleCSSFileChange(
 }
 
 func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails) {
+	if getIsNonEmptyCHMODOnly(evt) {
+		return
+	}
+
 	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
 
 	if !wfc.SkipRebuildingNotification {
@@ -422,10 +435,6 @@ func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) erro
 	})
 }
 
-func getIsModifyEvt(evt fsnotify.Event) bool {
-	return evt.Has(fsnotify.Write) || evt.Has(fsnotify.Remove) || evt.Has(fsnotify.Rename)
-}
-
 type EvtDetails struct {
 	isCriticalCss    bool
 	isNormalCss      bool
@@ -467,4 +476,27 @@ func getIsGo(evt fsnotify.Event) bool {
 
 func getIsCssEvtType(config *common.Config, evt fsnotify.Event, cssType ChangeType) bool {
 	return strings.HasPrefix(evt.Name, filepath.Join(config.GetCleanRootDir(), "styles/"+string(cssType)))
+}
+
+func getIsSolelyCHMOD(evt fsnotify.Event) bool {
+	return !evt.Has(fsnotify.Write) && !evt.Has(fsnotify.Create) && !evt.Has(fsnotify.Remove) && !evt.Has(fsnotify.Rename)
+}
+
+func getIsEmptyFile(evt fsnotify.Event) bool {
+	file, err := os.Open(evt.Name)
+	if err != nil {
+		util.Log.Errorf("error: failed to open file: %v", err)
+		return false
+	}
+	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		util.Log.Errorf("error: failed to get file stats: %v", err)
+		return false
+	}
+	return stat.Size() == 0
+}
+
+func getIsNonEmptyCHMODOnly(evt fsnotify.Event) bool {
+	return getIsSolelyCHMOD(evt) && !getIsEmptyFile(evt)
 }

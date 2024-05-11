@@ -9,7 +9,19 @@ import (
 func GetRefreshScriptInner(port int) string {
 	// changeTypes: "rebuilding", "other", "normal", "critical"
 	// Element IDs: "__refreshscript-rebuilding", "__normal-css", "__critical-css"
-	return fmt.Sprintf(`const es = new EventSource("http://localhost:%d/events");
+	return fmt.Sprintf(`
+const scrollYKey = "__kiruna_internal__devScrollY";
+const scrollY = localStorage.getItem(scrollYKey);
+if (scrollY) {
+	setTimeout(() => {
+		localStorage.removeItem(scrollYKey);
+		console.info("KIRUNA DEV: Restoring previous scroll position");
+		window.scrollTo({ top: scrollY, behavior: "smooth" })
+	}, 150);
+}
+
+const es = new EventSource("http://localhost:%d/events");
+
 es.onmessage = (e) => {
 	const { changeType, criticalCss, normalCssUrl, at } = JSON.parse(e.data);
 	if (changeType == "rebuilding") {
@@ -31,6 +43,10 @@ es.onmessage = (e) => {
 		el.style.alignItems = "center";
 	}
 	if (changeType == "other") {
+		const scrollY = window.scrollY;
+		if (scrollY > 0) {
+			localStorage.setItem(scrollYKey, scrollY);
+		}
 		window.location.reload();
 	}
 	if (changeType == "normal") {
@@ -49,7 +65,18 @@ es.onmessage = (e) => {
 		newStyle.innerHTML = criticalCss;
 		document.head.replaceChild(newStyle, oldStyle);
 	}
-};`, port)
+};
+
+es.addEventListener("error", (e) => {
+	console.log("SSE error", e);
+	es.close();
+	window.location.reload();
+});
+
+window.addEventListener("beforeunload", () => {
+	es.close();
+});
+`, port)
 }
 
 const RefreshDiv = `<div id="__refreshscript-rebuilding" style="display: none;">Rebuilding...</div>`
