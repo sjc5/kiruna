@@ -13,7 +13,7 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-var UrlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
+var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
 
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func ProcessCSS(config *common.Config, subDir string) error {
@@ -49,8 +49,8 @@ func ProcessCSS(config *common.Config, subDir string) error {
 	}
 
 	concatenatedCSSString := concatenatedCSS.String()
-	concatenatedCSSString = UrlRegex.ReplaceAllStringFunc(concatenatedCSSString, func(match string) string {
-		rawUrl := UrlRegex.FindStringSubmatch(match)[1]
+	concatenatedCSSString = urlRegex.ReplaceAllStringFunc(concatenatedCSSString, func(match string) string {
+		rawUrl := urlRegex.FindStringSubmatch(match)[1]
 		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
 		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
 			hashedUrl := runtime.GetPublicURL(config, cleanedUrl, true)

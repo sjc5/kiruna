@@ -11,16 +11,16 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
+const defaultFreePort = 51027
+
 func MustStartDev(config *common.Config) {
 	common.KirunaEnv.SetModeToDev()
 
 	if config.DevConfig.RefreshServerPort == 0 {
-		freePort, err := util.GetFreePort()
+		freePort, err := util.GetFreePort(defaultFreePort)
 		if err != nil {
-			freePort = 51027 // just a "random" port that is likely to be free
-			fmt.Printf("error: failed to get free port: %v\n", err)
-			fmt.Printf("attempting to use default fallback port: %d\n", freePort)
-			fmt.Printf("to specify a different port for the sidecar dev refresh server, manually set DevConfig.RefreshServerPort in your config\n")
+			util.Log.Errorf("error: failed to get free port: %v", err)
+			panic(err)
 		} else {
 			common.KirunaEnv.SetRefreshServerPort(freePort)
 		}

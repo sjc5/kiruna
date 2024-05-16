@@ -8,6 +8,7 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/dev"
 	"github.com/sjc5/kiruna/internal/runtime"
+	"github.com/sjc5/kiruna/internal/util"
 )
 
 type Config = common.Config
@@ -33,9 +34,6 @@ func (k Kiruna) GetPrivateFS() (*runtime.UniversalFS, error) {
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 	return runtime.GetPublicURL(k.Config, originalPublicURL, false)
-}
-func (k Kiruna) MakeRequisiteDirs() error {
-	return buildtime.MakeRequisiteDirs(k.Config)
 }
 func (k Kiruna) MustStartDev(devConfig *common.DevConfig) {
 	k.Config.DevConfig = devConfig
@@ -68,12 +66,9 @@ func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
 func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
 	return runtime.GetServeStaticHandler(k.Config, pathPrefix, cacheImmutably)
 }
-func (k Kiruna) GetIsDev() bool {
-	return common.KirunaEnv.GetIsDev()
-}
 
-func New(config *common.Config) Kiruna {
-	return Kiruna{
+func New(config *common.Config) *Kiruna {
+	return &Kiruna{
 		Config: config,
 	}
 }
@@ -82,7 +77,12 @@ type WatchedFile = common.WatchedFile
 type WatchedFiles = common.WatchedFiles
 type OnChangeFunc = common.OnChangeFunc
 type OnChange = common.OnChange
+type IgnorePatterns = common.IgnorePatterns
 
 const OnChangeStrategyConcurrent = common.OnChangeStrategyConcurrent
 const OnChangeStrategyPost = common.OnChangeStrategyPost
 const OnChangeStrategyPre = common.OnChangeStrategyPre
+
+var SetupDistDir = buildtime.SetupDistDir
+var GetFreePort = util.GetFreePort
+var GetIsDev = common.KirunaEnv.GetIsDev

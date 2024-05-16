@@ -7,23 +7,30 @@ import (
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
+	"github.com/sjc5/kit/pkg/executil"
 )
-
-var cachedUniFS *UniversalFS
-var fsType string
 
 const fsTypeDev = "dev"
 
-func GetUniversalDirFS(config *common.Config) (*UniversalFS, error) {
-	cachedUniFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
-	return cachedUniFS, nil
+var uniDirFSCacheMap = make(map[*common.Config]*UniversalFS)
+
+func GetUniversalDirFS(config *common.Config) *UniversalFS {
+	if hit, isCached := uniDirFSCacheMap[config]; isCached {
+		return hit
+	}
+	fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+	uniDirFSCacheMap[config] = fs
+	return fs
 }
 
+var uniFSCacheMap = make(map[*common.Config]*UniversalFS)
+var fsTypeCacheMap = make(map[*common.Config]string)
+
 func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
-	if cachedUniFS != nil {
-		needsReset := common.KirunaEnv.GetIsDev() && fsType != fsTypeDev
-		if !needsReset {
-			return cachedUniFS, nil
+	if hit, isCached := uniFSCacheMap[config]; isCached {
+		skipCache := common.KirunaEnv.GetIsDev() && fsTypeCacheMap[config] != fsTypeDev
+		if !skipCache {
+			return hit, nil
 		}
 	}
 
@@ -31,10 +38,13 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
 	if common.KirunaEnv.GetIsDev() {
-		fsType = fsTypeDev
+		// ensures "needsReset" is always true in dev
+		fsTypeCacheMap[config] = fsTypeDev
+
 		util.Log.Infof("using disk file system (development)")
-		cachedUniFS = newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
-		return cachedUniFS, nil
+		fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+		uniFSCacheMap[config] = fs // cache the fs
+		return fs, nil
 	}
 
 	// PROD
@@ -46,14 +56,20 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 		if err != nil {
 			return nil, err
 		}
-		cachedUniFS = newUniversalFS(FS)
-		return cachedUniFS, nil
+		fs := newUniversalFS(FS)
+		uniFSCacheMap[config] = fs // cache the fs
+		return fs, nil
 	}
 
 	// PROD
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
 	util.Log.Infof("using disk file system (production)")
-	cachedUniFS = newUniversalFS(os.DirFS(util.GetExecDir()))
-	return cachedUniFS, nil
+	execDir, err := executil.GetExecutableDir()
+	if err != nil {
+		return nil, err
+	}
+	fs := newUniversalFS(os.DirFS(execDir))
+	uniFSCacheMap[config] = fs // cache the fs
+	return fs, nil
 }

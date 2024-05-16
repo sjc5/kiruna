@@ -11,24 +11,48 @@ import (
 
 const StyleSheetElementID = "__normal-css"
 
+var styleSheetURLCacheMap = make(map[*common.Config]string)
+
 func GetStyleSheetURL(config *common.Config) string {
-	FS, err := GetUniversalFS(config)
+	cachedURL, isCached := styleSheetURLCacheMap[config]
+	if isCached {
+		return cachedURL
+	}
+
+	fs, err := GetUniversalFS(config)
 	if err != nil {
 		util.Log.Errorf("error getting FS: %v", err)
 		return ""
 	}
-	content, err := FS.ReadFile(filepath.Join("kiruna", "internal", "normal_css_file_ref.txt"))
+
+	content, err := fs.ReadFile(filepath.Join("kiruna", "internal", "normal_css_file_ref.txt"))
 	if err != nil {
 		util.Log.Errorf("error reading normal CSS URL: %v", err)
 		return ""
 	}
-	return "/public/" + string(content)
+
+	url := "/public/" + string(content)
+	styleSheetURLCacheMap[config] = url // Cache the URL
+	return url
 }
 
+var styleSheetElementCacheMap = make(map[*common.Config]template.HTML)
+
 func GetStyleSheetLinkElement(config *common.Config) template.HTML {
+	cachedEl, isCached := styleSheetElementCacheMap[config]
+	if isCached {
+		return cachedEl
+	}
+
 	url := GetStyleSheetURL(config)
 	if url == "" {
+		styleSheetElementCacheMap[config] = "" // Cache the empty string
 		return ""
 	}
-	return template.HTML(fmt.Sprintf("<link rel=\"stylesheet\" href=\"%s\" id=\"%s\" />", url, StyleSheetElementID))
+
+	el := template.HTML(fmt.Sprintf(
+		"<link rel=\"stylesheet\" href=\"%s\" id=\"%s\" />", url, StyleSheetElementID,
+	))
+	styleSheetElementCacheMap[config] = el // Cache the element
+	return el
 }

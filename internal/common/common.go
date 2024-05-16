@@ -12,20 +12,17 @@ const (
 	CSSCriticalDirName   = "critical"
 )
 
-type Map map[string]string
 type Callback func() error
 type Extensions map[string]Callback
 
-/*
-NOTE: Some of the comments in this file may be outdated.
-Ultimately they need to be brought up to date and moved
-into the README instead.
-*/
-
 type Config struct {
-	// If not nil, the embedded file system will be used in production builds
-	// If nil, the disk file system will be used in production builds
-	// Only relevant in prod (in dev mode, the real disk FS is always used)
+	/*
+		If not nil, the embedded file system will be used in production builds.
+		If nil, the disk file system will be used in production builds.
+		Only relevant in prod (in dev mode, the real disk FS is always used).
+		If nil in prod, you need to make sure that you ship the dist directory
+		with your binary. For simplicity, we recommend using the embedded FS.
+	*/
 	DistFS fs.FS
 
 	/*
@@ -59,6 +56,11 @@ func (c *Config) GetCleanRootDir() string {
 	return filepath.Clean(c.RootDir)
 }
 
+type IgnorePatterns struct {
+	Dirs  []string // Glob patterns
+	Files []string // Glob patterns
+}
+
 type DevConfig struct {
 	// REQUIRED
 	HealthcheckURL string
@@ -67,22 +69,10 @@ type DevConfig struct {
 	MaxReadinessAttempts int
 	ReadinessSleepTime   time.Duration
 	RefreshServerPort    int
-
-	WatchedFiles WatchedFiles
-
-	// __TODO -- glob for ignore list? so supports dirs and files?
-
-	// Directories to ignore when watching for changes
-	// Should be set relative to the RootDir
-	// Default ignored list is "dist" relative to RootDir,
-	// and "node_modules" and ".git" relative to the
-	// directory from where you run your dev/build commands.
-	// IgnoreDirs will be appended to the default list
-	IgnoreDirs []string
-
-	ServerOnly bool
-
-	CSSConfig CSSConfig
+	WatchedFiles         WatchedFiles
+	IgnorePatterns       IgnorePatterns // Glob patterns
+	ServerOnly           bool
+	CSSConfig            CSSConfig
 }
 
 const OnChangeStrategyPre = "pre"
@@ -92,9 +82,9 @@ const OnChangeStrategyConcurrent = "concurrent"
 type OnChangeFunc func(string) error
 
 type OnChange struct {
-	Strategy      string
-	Func          OnChangeFunc
-	ExcludedFiles []string
+	Strategy         string
+	Func             OnChangeFunc
+	ExcludedPatterns []string // Glob patterns
 }
 
 type CSSConfig struct {
@@ -102,6 +92,8 @@ type CSSConfig struct {
 }
 
 type WatchedFile struct {
+	Pattern string // Glob pattern
+
 	// OnChange runs before any Kiruna processing, except that as long as "SkipRebuildingNotification"
 	// is false (default), Kiruna will send a signal to the browser to show the
 	// "Rebuilding..." status message first.
@@ -110,8 +102,8 @@ type WatchedFile struct {
 	// Use this if you need the binary recompiled before the browser is reloaded
 	RecompileBinary bool
 
-	// Use this if your onChange saves a file that will trigger another reload process
-	// Or for any other reason if you need it
+	// Use this if your onChange saves a file that will trigger another reload process,
+	// or if you need this behavior for any other reason. Will not reload the browser.
 	RunOnChangeOnly bool
 
 	// Use this if you are using RunOnChangeOnly, but your onchange won't actually
@@ -119,34 +111,16 @@ type WatchedFile struct {
 	// showing in the browser)
 	SkipRebuildingNotification bool
 
-	// Set this to true if you're eagerly evaluating and caching your templates
-	// during development. This will trigger a hard restart of the server so your
-	// templates re-evaluate, but still can skip recompiling the binary. If you are
-	// lazily evaluating your templates during development (i.e., re-reading them on
-	// every request), you can leave this as false (the default).
+	// Use this if you explicitly need the app to be restarted before reloading the browser.
+	// Example: You might need this if you memory cache template files on first hit, in which
+	// case you would want to restart the app to clear the cache.
 	RestartApp bool
+
+	// This may come into play if you have a .go file that is totally independent from you
+	// app, such as a wasm file that you are building with a separate build process and serving
+	// from your app. If you set this to true, processing on any captured .go file will be as
+	// though it were an arbitrary non-Go file extension.
+	TreatAsNonGo bool
 }
 
-type WatchedFiles map[string]WatchedFile
-
-// Two plausible WatchedFiles examples:
-
-// 1. Changing Tailwind globals.css, which should be exported into styles/normal/from-tailwind.css (or whatever)
-// We would want this to NOT recompile Go, but only to have Tailwind's output cause Kiruna to hot refresh,
-// because only CSS changed. So we want (1) to send a rebuilding signal to the browser, and (2) run the OnChange
-// (which re-runs Tailwind), and that's it. To do this, we would set an entry in WatchedFiles to ".css" with
-// RunOnChangeOnly: true. This would trigger another round the WatchedFiles checks, because it will have seen
-// a change to where Tailwind output the new CSS from the OnChange (e.g., styles/normal/from-tailwind.css),
-// and that second round will handle the appropriate refreshing.
-
-// 2. Changing a template file that should re-run Tailwind, but not recompile Go. We would want this to (1) send
-// a rebuilding signal to browser, (2) run the OnChange (which re-runs Tailwind), and (3) hard refresh the browser.
-// To do this, we would set an entry in WatchedFiles with whatever extension the template file has, and set the
-// OnChange to a function that re-runs Tailwind. The other settings will default to false, so this is all we need
-// to get this behavior.
-
-// NOTE! If you are not lazily evaluating your templates during development, you will need to set RestartApp
-// to true. This is because the default behavior is to only restart the app when a Go file changes, and if
-// you are eagerly evaluating and caching your templates, you won't see changes you made to your template when
-// you reload the page, because the app won't have restarted. If you are lazily evaluating your templates, you
-// can leave this as false (the default).
+type WatchedFiles []WatchedFile

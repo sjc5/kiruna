@@ -17,7 +17,10 @@ func SetupNewBuild(config *common.Config) error {
 		return fmt.Errorf("error removing dist/kiruna directory: %v", err)
 	}
 	// re-make required directories
-	err = MakeRequisiteDirs(config)
+	isServerOnly := config.DevConfig != nil && config.DevConfig.ServerOnly
+	if !isServerOnly {
+		err = SetupDistDir(config.RootDir)
+	}
 	if err != nil {
 		return fmt.Errorf("error making requisite directories: %v", err)
 	}

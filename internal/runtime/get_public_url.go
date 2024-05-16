@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -8,23 +9,44 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-var fileMapFromGlob common.Map
+var fileMapFromGlobCacheMap = make(map[string]*map[string]string)
+var urlCacheMap = make(map[string]string)
 
 func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool) string {
-	if fileMapFromGlob == nil {
-		var err error
-		fileMapFromGlob, err = loadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
+	fileMapKey := fmt.Sprintf("%p", config) + fmt.Sprintf("%t", useDirFS)
+	urlKey := fileMapKey + originalPublicURL
+
+	if hit, isCached := urlCacheMap[urlKey]; isCached {
+		return hit
+	}
+
+	if fileMapFromGlobCacheMap[fileMapKey] == nil {
+		fileMapFromGob, err := loadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
 		if err != nil {
 			util.Log.Errorf("error loading file map from gob: %v", err)
 			return originalPublicURL
 		}
+		fileMapFromGlobCacheMap[fileMapKey] = &fileMapFromGob
 	}
-	cleanedOriginalPublicURL := filepath.Clean(originalPublicURL)
-	cleanedOriginalPublicURL = strings.TrimPrefix(cleanedOriginalPublicURL, "/")
-	hashed, ok := fileMapFromGlob[cleanedOriginalPublicURL]
-	if !ok {
-		util.Log.Infof("GetPublicURL: no hashed URL found for %s, returning original URL", originalPublicURL)
-		return "/public/" + originalPublicURL
+
+	fileMap := *fileMapFromGlobCacheMap[fileMapKey]
+
+	if hashedURL, existsInFileMap := fileMap[cleanURL(originalPublicURL)]; existsInFileMap {
+		finalURL := "/public/" + hashedURL
+		urlCacheMap[urlKey] = finalURL // Cache the hashed URL
+		return finalURL
 	}
-	return "/public/" + hashed
+
+	// If no hashed URL found, return the original URL
+	util.Log.Infof(
+		"GetPublicURL: no hashed URL found for %s, returning original URL",
+		originalPublicURL,
+	)
+	finalURL := "/public/" + originalPublicURL
+	urlCacheMap[urlKey] = finalURL // Cache the original URL
+	return finalURL
+}
+
+func cleanURL(url string) string {
+	return strings.TrimPrefix(filepath.Clean(url), "/")
 }

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sjc5/kiruna/internal/buildtime"
 	"github.com/sjc5/kiruna/internal/common"
@@ -15,9 +16,13 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
+var ignoredDirPatterns = []string{".git", "node_modules", "dist/bin", "dist/kiruna"}
+var ignoredFilePatterns = []string{}
+
 func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 	defer mustKillAppDev()
-	setupExtKeys(config)
+	ignoredDirPatterns = append(ignoredDirPatterns, config.DevConfig.IgnorePatterns.Dirs...)
+	ignoredFilePatterns = append(ignoredFilePatterns, config.DevConfig.IgnorePatterns.Files...)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to create watcher: %v", err)
@@ -25,7 +30,7 @@ func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 		panic(errMsg)
 	}
 	defer watcher.Close()
-	err = addDirs(config, watcher, config.GetCleanRootDir())
+	err = addDirs(watcher, config.GetCleanRootDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to add directories to watcher: %v", err)
 		util.Log.Error(errMsg)
@@ -53,7 +58,7 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
 				fileInfo, err := os.Stat(evt.Name)
 				if err == nil && fileInfo.IsDir() {
-					err := addDirs(config, watcher, evt.Name)
+					err := addDirs(watcher, evt.Name)
 					if err != nil {
 						util.Log.Errorf("error: failed to add directory to watcher: %v", err)
 						return
@@ -62,7 +67,16 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 			}
 
 			evtDetails := getEvtDetails(config, evt)
+			if evtDetails.isIgnored {
+				continue
+			}
 			if getIsGo(evt) {
+				if evtDetails.matchingWatchedFile != nil {
+					if evtDetails.matchingWatchedFile.TreatAsNonGo {
+						mustHandleOtherFileChange(config, manager, evt, evtDetails)
+						continue
+					}
+				}
 				mustHandleGoFileChange(config, manager, evt, evtDetails)
 			} else {
 				if !config.DevConfig.ServerOnly {
@@ -70,7 +84,7 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 						mustHandleCSSFileChange(config, manager, evt, ChangeTypeCriticalCSS)
 					} else if evtDetails.isNormalCss {
 						mustHandleCSSFileChange(config, manager, evt, ChangeTypeNormalCSS)
-					} else if evtDetails.shouldReload {
+					} else if evtDetails.matchingWatchedFile != nil {
 						mustHandleOtherFileChange(config, manager, evt, evtDetails)
 					}
 				}
@@ -118,17 +132,13 @@ func sortOnChangeCallbacks(onChanges []common.OnChange) sortedOnChangeCallbacks 
 	}
 }
 
-func getIsIgnored(evtName string, excludedFiles []string) bool {
-	isIgnored := false
-	if len(excludedFiles) > 0 {
-		for _, ignoreFile := range excludedFiles {
-			if strings.HasSuffix(evtName, ignoreFile) {
-				isIgnored = true
-				break
-			}
+func getIsIgnored(path string, ignoredPatterns *[]string) bool {
+	for _, pattern := range *ignoredPatterns {
+		if getIsMatch(pattern, path) {
+			return true
 		}
 	}
-	return isIgnored
+	return false
 }
 
 func runConcurrentOnChangeCallbacks(sortedOnChanges *sortedOnChangeCallbacks, evtName string) {
@@ -136,7 +146,7 @@ func runConcurrentOnChangeCallbacks(sortedOnChanges *sortedOnChangeCallbacks, ev
 		wg := sync.WaitGroup{}
 		wg.Add(len(sortedOnChanges.stratConcurrent))
 		for _, o := range sortedOnChanges.stratConcurrent {
-			if getIsIgnored(evtName, o.ExcludedFiles) {
+			if getIsIgnored(evtName, &o.ExcludedPatterns) {
 				wg.Done()
 				continue
 			}
@@ -154,7 +164,7 @@ func runConcurrentOnChangeCallbacks(sortedOnChanges *sortedOnChangeCallbacks, ev
 
 func simpleRunOnChangeCallbacks(onChanges []common.OnChange, evtName string) {
 	for _, o := range onChanges {
-		if getIsIgnored(evtName, o.ExcludedFiles) {
+		if getIsIgnored(evtName, &o.ExcludedPatterns) {
 			continue
 		}
 		err := o.Func(evtName)
@@ -180,13 +190,25 @@ func mustHandleGoFileChange(
 		}
 	}
 
-	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
+	wfc := evtDetails.matchingWatchedFile
+	if wfc == nil {
+		wfc = &common.WatchedFile{}
+	}
+
 	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
 
 	var buildErr error
 
 	if sortedOnChanges.exists {
 		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+
+		// You would do this if you want to trigger a process that itself
+		// saves to a file (evt.g., to styles/critical/whatever.css) that
+		// would in turn trigger the rebuild in another run
+		if wfc.RunOnChangeOnly {
+			util.Log.Infof("ran applicable onChange callbacks")
+			return
+		}
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -281,7 +303,10 @@ func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, ev
 		return
 	}
 
-	wfc := (config.DevConfig.WatchedFiles)[evtDetails.complexExtension]
+	wfc := evtDetails.matchingWatchedFile
+	if wfc == nil {
+		return
+	}
 
 	if !wfc.SkipRebuildingNotification {
 		manager.broadcast <- RefreshFilePayload{
@@ -299,7 +324,7 @@ func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, ev
 		// saves to a file (evt.g., to styles/critical/whatever.css) that
 		// would in turn trigger the rebuild in another run
 		if wfc.RunOnChangeOnly {
-			util.Log.Infof("onchange complete, work is done")
+			util.Log.Infof("ran applicable onChange callbacks")
 			return
 		}
 
@@ -384,47 +409,14 @@ func mustReloadBroadcast(config *common.Config, manager *ClientManager, rfp Refr
 	panic(errMsg)
 }
 
-var extKeys []string = nil
-
-func setupExtKeys(config *common.Config) {
-	if extKeys == nil {
-		extKeys = []string{}
-		if config.DevConfig.WatchedFiles != nil {
-			for k := range config.DevConfig.WatchedFiles {
-				extKeys = append(extKeys, k)
-			}
-		}
-	}
-}
-
-var standardIgnoreDirList = []string{".git", "node_modules", "dist/bin", "dist/kiruna"}
-
-func getStandardIgnoreDirList(config *common.Config) []string {
-	if len(standardIgnoreDirList) > 0 {
-		return standardIgnoreDirList
-	}
-	distRelativeToRootDir := filepath.Join(config.GetCleanRootDir(), "dist")
-	execDir := util.GetExecDir()
-	nodeModules := filepath.Join(execDir, "node_modules")
-	gitDir := filepath.Join(execDir, ".git")
-	return append(standardIgnoreDirList, distRelativeToRootDir, nodeModules, gitDir)
-}
-
-func isDirOrChildOfDir(dir string, parent string) bool {
-	return strings.HasPrefix(filepath.Clean(dir), filepath.Clean(parent))
-}
-
-func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) error {
+func addDirs(watcher *fsnotify.Watcher, path string) error {
 	return filepath.Walk(path, func(walkedPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("error walking path: %v", err)
 		}
 		if info.IsDir() {
-			for _, ignoreDir := range append(getStandardIgnoreDirList(config), config.DevConfig.IgnoreDirs...) {
-				ignoreDirRelative := filepath.Join(config.GetCleanRootDir(), ignoreDir)
-				if isDirOrChildOfDir(walkedPath, ignoreDirRelative) {
-					return filepath.SkipDir
-				}
+			if getIsIgnored(walkedPath, &ignoredDirPatterns) {
+				return filepath.SkipDir
 			}
 			err := watcher.Add(walkedPath)
 			if err != nil {
@@ -436,33 +428,57 @@ func addDirs(config *common.Config, watcher *fsnotify.Watcher, path string) erro
 }
 
 type EvtDetails struct {
-	isCriticalCss    bool
-	isNormalCss      bool
-	shouldReload     bool
-	complexExtension string
+	isIgnored           bool
+	isCriticalCss       bool
+	isNormalCss         bool
+	matchingWatchedFile *common.WatchedFile
+}
+
+var cachedMatchResults = map[string]bool{}
+
+func getIsMatch(pattern string, path string) bool {
+	combined := pattern + path
+
+	if hit, isCached := cachedMatchResults[combined]; isCached {
+		return hit
+	}
+
+	normalizedPath := filepath.ToSlash(path)
+
+	matches, err := doublestar.Match(pattern, normalizedPath)
+	if err != nil {
+		util.Log.Errorf("error: failed to match file: %v", err)
+		return false
+	}
+
+	cachedMatchResults[combined] = matches // cache the result
+	return matches
 }
 
 func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
 	isCssSimple := getIsCss(evt)
 	isCriticalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeCriticalCSS)
 	isNormalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeNormalCSS)
-	isCss := isCriticalCss || isNormalCss
-	shouldReload := false
-	var complexExtension string
-	if !isCss {
-		for _, ext := range extKeys {
-			if strings.HasSuffix(evt.Name, ext) {
-				shouldReload = true
-				complexExtension = ext
+	isKirunaCss := isCriticalCss || isNormalCss
+	isIgnored := getIsIgnored(evt.Name, &ignoredFilePatterns)
+
+	var matchingWatchedFile *common.WatchedFile
+
+	if !isKirunaCss {
+		for _, wfc := range config.DevConfig.WatchedFiles {
+			isMatch := getIsMatch(wfc.Pattern, evt.Name)
+			if isMatch {
+				matchingWatchedFile = &wfc
 				break
 			}
 		}
 	}
+
 	return EvtDetails{
-		isCriticalCss:    isCriticalCss,
-		isNormalCss:      isNormalCss,
-		shouldReload:     shouldReload,
-		complexExtension: complexExtension,
+		isIgnored:           isIgnored,
+		isCriticalCss:       isCriticalCss,
+		isNormalCss:         isNormalCss,
+		matchingWatchedFile: matchingWatchedFile,
 	}
 }
 

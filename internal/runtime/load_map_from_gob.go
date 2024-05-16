@@ -8,11 +8,11 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 )
 
-func loadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (common.Map, error) {
+func loadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (map[string]string, error) {
 	var FS *UniversalFS
 	var err error
 	if useDirFS {
-		FS, err = GetUniversalDirFS(config)
+		FS = GetUniversalDirFS(config)
 	} else {
 		FS, err = GetUniversalFS(config)
 	}
@@ -25,7 +25,7 @@ func loadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (c
 	}
 	defer file.Close()
 	decoder := gob.NewDecoder(file)
-	var mapFromGob common.Map
+	var mapFromGob map[string]string
 	err = decoder.Decode(&mapFromGob)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding gob: %v", err)
