@@ -51,8 +51,12 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// If we are using the embedded file system, we should use the dist file system
 	if config.GetIsUsingEmbeddedFS() {
 		util.Log.Infof("using embedded file system (production)")
-		distFS := config.DistFS
-		FS, err := fs.Sub(distFS, "dist/kiruna")
+
+		// Assuming the embed directive looks like this:
+		// //go:embed kiruna
+		// That means that the kiruna folder itself (not just its contents) is embedded.
+		// So we have to drop down into the kiruna folder here.
+		FS, err := fs.Sub(config.DistFS, "kiruna")
 		if err != nil {
 			return nil, err
 		}
