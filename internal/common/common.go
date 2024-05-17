@@ -63,7 +63,7 @@ type IgnorePatterns struct {
 
 type DevConfig struct {
 	// REQUIRED
-	HealthcheckURL string
+	HealthcheckEndpoint string // e.g., "/healthz" -- should return 200 OK if healthy
 
 	// OPTIONAL
 	MaxReadinessAttempts int

@@ -26,7 +26,8 @@ es.onmessage = (e) => {
 	const { changeType, criticalCss, normalCssUrl, at } = JSON.parse(e.data);
 	if (changeType == "rebuilding") {
 		console.log("Rebuilding server...");
-		const el = document.getElementById("__refreshscript-rebuilding");
+		const el = document.createElement("div");
+		el.innerHTML = "Rebuilding...";
 		el.style.display = "flex";
 		el.style.position = "fixed";
 		el.style.inset = "0";
@@ -41,6 +42,7 @@ es.onmessage = (e) => {
 		el.style.textShadow = "2px 2px 2px #000";
 		el.style.justifyContent = "center";
 		el.style.alignItems = "center";
+		document.body.appendChild(el);
 	}
 	if (changeType == "other") {
 		const scrollY = window.scrollY;
@@ -79,12 +81,10 @@ window.addEventListener("beforeunload", () => {
 `, port)
 }
 
-const RefreshDiv = `<div id="__refreshscript-rebuilding" style="display: none;">Rebuilding...</div>`
-
 func GetRefreshScript(config *common.Config) string {
 	if !common.KirunaEnv.GetIsDev() {
 		return ""
 	}
 	inner := GetRefreshScriptInner(common.KirunaEnv.GetRefreshServerPort())
-	return RefreshDiv + "\n<script>\n" + inner + "\n</script>"
+	return "\n<script>\n" + inner + "\n</script>"
 }

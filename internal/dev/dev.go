@@ -16,6 +16,10 @@ const defaultFreePort = 51027
 func MustStartDev(config *common.Config) {
 	common.KirunaEnv.SetModeToDev()
 
+	// Warm port right away, in case default is unavailable
+	// Also, env needs to be set in this scope
+	util.MustGetPort()
+
 	if config.DevConfig.RefreshServerPort == 0 {
 		freePort, err := util.GetFreePort(defaultFreePort)
 		if err != nil {

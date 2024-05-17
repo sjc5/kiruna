@@ -84,5 +84,5 @@ const OnChangeStrategyPost = common.OnChangeStrategyPost
 const OnChangeStrategyPre = common.OnChangeStrategyPre
 
 var SetupDistDir = buildtime.SetupDistDir
-var GetFreePort = util.GetFreePort
+var MustGetPort = util.MustGetPort
 var GetIsDev = common.KirunaEnv.GetIsDev

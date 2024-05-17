@@ -2,45 +2,73 @@ package util
 
 import (
 	"fmt"
+	"log"
 	"net"
-	"net/http"
-	"time"
+
+	"github.com/sjc5/kiruna/internal/common"
 )
 
-const maxOffset = 100
+const maxOffset = 1024
+
+func MustGetPort() int {
+	isDev := common.KirunaEnv.GetIsDev()
+	portHasBeenSet := common.KirunaEnv.GetPortHasBeenSet()
+	defaultPort := common.KirunaEnv.GetPort()
+
+	if !isDev || portHasBeenSet {
+		return defaultPort
+	}
+
+	port, err := GetFreePort(defaultPort)
+	if err != nil {
+		log.Panicf("error: failed to get free port: %v", err)
+	}
+
+	common.KirunaEnv.SetPort(port)
+	common.KirunaEnv.SetPortHasBeenSet()
+
+	return port
+}
 
 func GetFreePort(defaultPort int) (int, error) {
+	if defaultPort == 0 {
+		defaultPort = 8080
+	}
+
 	if port, err := checkPortAvailability(defaultPort); err == nil {
 		return port, nil
 	}
 
-	for offset := 1; offset <= maxOffset; offset++ {
-		for _, port := range []int{defaultPort + offset, defaultPort} {
-			if port >= 0 && port <= 65535 {
-				if port, err := checkPortAvailability(port); err == nil {
-					return port, nil
-				}
+	for i := range maxOffset {
+		port := defaultPort + i
+		if port >= 0 && port <= 65535 {
+			if port, err := checkPortAvailability(port); err == nil {
+				Log.Warningf(
+					"port %d unavailable: falling back to port %d",
+					defaultPort,
+					port,
+				)
+				return port, nil
 			}
+		} else {
+			break
 		}
 	}
 
-	return getRandomFreePort()
+	port, err := getRandomFreePort()
+	if err != nil {
+		return defaultPort, err
+	}
+
+	return port, nil
 }
 
 func checkPortAvailability(port int) (int, error) {
-	fakeServer := &http.Server{Addr: fmt.Sprintf(":%d", port)}
-	defer fakeServer.Close()
-
-	go func() {
-		time.Sleep(1 * time.Millisecond)
-		fakeServer.Close()
-	}()
-
-	err := fakeServer.ListenAndServe()
-	if err != http.ErrServerClosed {
-		fmt.Printf("port %d is unavailable\n", port)
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
 		return 0, err
 	}
+	defer ln.Close()
 
 	return port, nil
 }
