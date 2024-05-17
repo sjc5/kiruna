@@ -25,7 +25,8 @@ func GetStyleSheetURL(config *common.Config) string {
 		return ""
 	}
 
-	content, err := fs.ReadFile(filepath.Join("kiruna", "internal", "normal_css_file_ref.txt"))
+	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
+	content, err := fs.ReadFile(filepath.Join("internal", "normal_css_file_ref.txt"))
 	if err != nil {
 		util.Log.Errorf("error reading normal CSS URL: %v", err)
 		return ""

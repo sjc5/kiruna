@@ -41,7 +41,8 @@ func GetCriticalCSS(config *common.Config) string {
 	}
 
 	// Read critical CSS
-	content, err := fs.ReadFile(filepath.Join("kiruna", "internal", "critical.css"))
+	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
+	content, err := fs.ReadFile(filepath.Join("internal", "critical.css"))
 	if err != nil {
 		// Check if the error is a non-existent file
 		noSuchFile := strings.HasSuffix(err.Error(), "no such file or directory")
