@@ -10,7 +10,9 @@ import (
 )
 
 func getFS(config *common.Config, subDir string) (*UniversalFS, error) {
-	path := filepath.Join("kiruna", "static", subDir)
+	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
+	path := filepath.Join("static", subDir)
+
 	FS, err := GetUniversalFS(config)
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)

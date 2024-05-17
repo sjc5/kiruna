@@ -27,10 +27,7 @@ func mustKillAppDev() {
 }
 
 func mustStartAppDev(config *common.Config) {
-	if config.BinOutputFilename == "" {
-		config.BinOutputFilename = "main"
-	}
-	buildDest := filepath.Join(config.GetCleanRootDir(), "dist", "bin", config.BinOutputFilename)
+	buildDest := filepath.Join(config.GetCleanRootDir(), "dist/bin/main")
 	lastBuildCmd = exec.Command(buildDest)
 	lastBuildCmd.Stdout = os.Stdout
 	lastBuildCmd.Stderr = os.Stderr

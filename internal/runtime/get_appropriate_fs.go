@@ -18,7 +18,7 @@ func GetUniversalDirFS(config *common.Config) *UniversalFS {
 	if hit, isCached := uniDirFSCacheMap[config]; isCached {
 		return hit
 	}
-	fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+	fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist/kiruna")))
 	uniDirFSCacheMap[config] = fs
 	return fs
 }
@@ -42,7 +42,7 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 		fsTypeCacheMap[config] = fsTypeDev
 
 		util.Log.Infof("using disk file system (development)")
-		fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist")))
+		fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist/kiruna")))
 		uniFSCacheMap[config] = fs // cache the fs
 		return fs, nil
 	}
@@ -52,7 +52,7 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	if config.GetIsUsingEmbeddedFS() {
 		util.Log.Infof("using embedded file system (production)")
 		distFS := config.DistFS
-		FS, err := fs.Sub(distFS, "dist")
+		FS, err := fs.Sub(distFS, "dist/kiruna")
 		if err != nil {
 			return nil, err
 		}

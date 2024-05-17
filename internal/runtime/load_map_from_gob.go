@@ -19,10 +19,13 @@ func loadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (m
 	if err != nil {
 		return nil, fmt.Errorf("error getting FS: %v", err)
 	}
-	file, err := FS.Open(filepath.Join("kiruna", "internal", gobFileName))
+
+	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
+	file, err := FS.Open(filepath.Join("internal", gobFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %v", err)
 	}
+
 	defer file.Close()
 	decoder := gob.NewDecoder(file)
 	var mapFromGob map[string]string

@@ -45,8 +45,6 @@ type Config struct {
 	EntryPoint string
 
 	DevConfig *DevConfig
-
-	BinOutputFilename string
 }
 
 func (c *Config) GetIsUsingEmbeddedFS() bool {
