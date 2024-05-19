@@ -2,7 +2,11 @@
 
 ## What is Kiruna?
 
-Kiruna is a bit like Vite, but for Go. It's a development server and build tool that provides hot CSS reloading, automatic browser refreshes, and automatic server rebuilds during development, and it optimizes your web application for production.
+Kiruna is a bit like Vite, but for Go.
+
+It's a development server and build tool that provides hot CSS reloading, automatic browser refreshes, and automatic server rebuilds during development, and it optimizes your web application for production, including static file hashing and embedding and CSS minification.
+
+Dev-time reloads are smart and fast. Based on the type of file you edit and your associated configuration options, Kiruna will do the minimum amount of work necessary to get your changes to your browser as quickly as possible.
 
 ## Starter Tutorial From Scratch
 
