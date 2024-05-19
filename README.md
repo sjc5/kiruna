@@ -8,6 +8,8 @@ It's a development server and build tool that provides hot CSS reloading, automa
 
 Dev-time reloads are smart and fast. Based on the type of file you edit and your associated configuration options, Kiruna will do the minimum amount of work necessary to get your changes to your browser as quickly as possible.
 
+Runtime helpers (e.g., `Kiruna.GetPublicURL("favicon.ico")`) make it easy to reference your static assets in your Go code and templates, and the `Kiruna.GetCriticalCSSStyleElement` and `Kiruna.GetStyleSheetLinkElement` helpers make it easy to include your CSS in your HTML templates. They are lightweight and, whenever possible, cached, so you don't have to worry about performance.
+
 ## Starter Tutorial From Scratch
 
 ### Scaffolding
