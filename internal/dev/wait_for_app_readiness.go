@@ -9,15 +9,10 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
+const maxAttempts = 100
+const readinessSleepTime = 20 * time.Millisecond
+
 func waitForAppReadiness(config *common.Config) bool {
-	maxAttempts := config.DevConfig.MaxReadinessAttempts
-	if maxAttempts == 0 {
-		maxAttempts = 100
-	}
-	readinessSleepTime := config.DevConfig.ReadinessSleepTime
-	if readinessSleepTime == 0 {
-		readinessSleepTime = 20 * time.Millisecond
-	}
 	for attempts := 0; attempts < maxAttempts; attempts++ {
 		url := fmt.Sprintf(
 			"http://localhost:%d%s",

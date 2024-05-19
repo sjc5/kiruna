@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,10 +57,8 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 			time.Sleep(10 * time.Millisecond) // let the file system settle
 
 			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
-				fileInfo, err := os.Stat(evt.Name)
-				if err == nil && fileInfo.IsDir() {
-					err := addDirs(watcher, evt.Name)
-					if err != nil {
+				if fileInfo, err := os.Stat(evt.Name); err == nil && fileInfo.IsDir() {
+					if err := addDirs(watcher, evt.Name); err != nil {
 						util.Log.Errorf("error: failed to add directory to watcher: %v", err)
 						return
 					}
@@ -70,23 +69,24 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 			if evtDetails.isIgnored {
 				continue
 			}
+
 			if getIsGo(evt) {
-				if evtDetails.matchingWatchedFile != nil {
-					if evtDetails.matchingWatchedFile.TreatAsNonGo {
-						mustHandleOtherFileChange(config, manager, evt, evtDetails)
-						continue
-					}
+				if evtDetails.matchingWatchedFile != nil && evtDetails.matchingWatchedFile.TreatAsNonGo {
+					mustHandleOtherFileChange(config, manager, evt, evtDetails)
+					continue
 				}
 				mustHandleGoFileChange(config, manager, evt, evtDetails)
-			} else {
-				if !config.DevConfig.ServerOnly {
-					if evtDetails.isCriticalCss {
-						mustHandleCSSFileChange(config, manager, evt, ChangeTypeCriticalCSS)
-					} else if evtDetails.isNormalCss {
-						mustHandleCSSFileChange(config, manager, evt, ChangeTypeNormalCSS)
-					} else if evtDetails.matchingWatchedFile != nil {
-						mustHandleOtherFileChange(config, manager, evt, evtDetails)
-					}
+				continue
+			}
+
+			if !config.DevConfig.ServerOnly {
+				switch {
+				case evtDetails.isCriticalCss:
+					mustHandleCSSFileChange(config, manager, evt, evtDetails, ChangeTypeCriticalCSS)
+				case evtDetails.isNormalCss:
+					mustHandleCSSFileChange(config, manager, evt, evtDetails, ChangeTypeNormalCSS)
+				case evtDetails.matchingWatchedFile != nil:
+					mustHandleOtherFileChange(config, manager, evt, evtDetails)
 				}
 			}
 
@@ -254,6 +254,7 @@ func mustHandleCSSFileChange(
 	config *common.Config,
 	manager *ClientManager,
 	evt fsnotify.Event,
+	evtDetails EvtDetails,
 	cssType ChangeType,
 ) {
 	if getIsNonEmptyCHMODOnly(evt) {
@@ -261,25 +262,60 @@ func mustHandleCSSFileChange(
 	}
 
 	var cssBuildErr error
-	sortedOnChanges := sortOnChangeCallbacks(config.DevConfig.CSSConfig.OnChangeCallbacks)
+
+	wfc := evtDetails.matchingWatchedFile
+	if wfc == nil {
+		wfc = &common.WatchedFile{}
+	}
+
+	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
+
 	if sortedOnChanges.exists {
 		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+
+		if wfc.RunOnChangeOnly {
+			util.Log.Infof("ran applicable onChange callbacks")
+			return
+		}
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
+			if wfc.RecompileBinary || wfc.RestartApp {
+				cssBuildErr = runOtherFileBuild(config, wfc)
+			} else {
+				cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
+			}
 		}()
 
 		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
 		wg.Wait()
 	} else {
-		cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
+		if wfc.RecompileBinary || wfc.RestartApp {
+			cssBuildErr = runOtherFileBuild(config, wfc)
+		} else {
+			cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
+		}
 	}
 
 	if cssBuildErr != nil {
 		util.Log.Errorf("error: failed to process %s CSS: %v", cssType, cssBuildErr)
+		return
+	}
+
+	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
+
+	if wfc.RecompileBinary || wfc.RestartApp {
+		mustKillAndRestart(config)
+		util.Log.Infof("hard reloading browser")
+		mustReloadBroadcast(
+			config,
+			manager,
+			RefreshFilePayload{
+				ChangeType: ChangeTypeOther,
+			},
+		)
 		return
 	}
 
@@ -314,15 +350,20 @@ func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, ev
 		}
 		util.Log.Infof("modified: %s, rebuilding static assets", evt.Name)
 	}
+
+	if wfc.RecompileBinary {
+		util.Log.Infof("doing a full recompile")
+	} else {
+		util.Log.Infof("skipping full recompile")
+	}
+
 	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
 
+	var buildErr error
+
 	if sortedOnChanges.exists {
-		var buildErr error
 		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
 
-		// You would do this if you want to trigger a process that itself
-		// saves to a file (evt.g., to styles/critical/whatever.css) that
-		// would in turn trigger the rebuild in another run
 		if wfc.RunOnChangeOnly {
 			util.Log.Infof("ran applicable onChange callbacks")
 			return
@@ -332,58 +373,21 @@ func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, ev
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
-			// This is different than inside of handleGoFileChange, because here we
-			// assume we need to re-run other build steps too, not just recompile Go.
-			// Also, we don't necessarily recompile Go here (we only necessarily) run
-			// the other build steps. We only recompile Go if wfc.RecompileBinary is true.
-			buildErr = buildtime.SetupNewBuild(config)
-			if buildErr != nil {
-				util.Log.Errorf("error: failed to setup new build: %v", buildErr)
-				return
-			}
-			buildErr = buildtime.RunPrecompileTasks(config)
-			if buildErr != nil {
-				util.Log.Errorf("error: failed to run precompile tasks: %v", buildErr)
-				return
-			}
-			if wfc.RecompileBinary {
-				buildErr = buildtime.CompileBinary(config)
-				if buildErr != nil {
-					util.Log.Errorf("error: failed to recompile binary: %v", buildErr)
-					return
-				}
-			}
+			buildErr = runOtherFileBuild(config, wfc)
 		}()
 
 		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
 		wg.Wait()
 	} else {
-		var buildErr error
-		buildErr = buildtime.SetupNewBuild(config)
-		if buildErr != nil {
-			util.Log.Errorf("error: failed to setup new build: %v", buildErr)
-			return
-		}
-		buildErr = buildtime.RunPrecompileTasks(config)
-		if buildErr != nil {
-			util.Log.Errorf("error: failed to run precompile tasks: %v", buildErr)
-			return
-		}
-		if wfc.RecompileBinary {
-			buildErr = buildtime.CompileBinary(config)
-			if buildErr != nil {
-				util.Log.Errorf("error: failed to recompile binary: %v", buildErr)
-				return
-			}
-		}
+		buildErr = runOtherFileBuild(config, wfc)
 	}
 
-	if wfc.RecompileBinary {
-		util.Log.Infof("doing a full recompile")
-	} else {
-		util.Log.Infof("skipping full recompile")
+	if buildErr != nil {
+		util.Log.Errorf("error: failed to build app: %v", buildErr)
+		return
 	}
+
+	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
 
 	if wfc.RecompileBinary || wfc.RestartApp {
 		mustKillAndRestart(config)
@@ -397,6 +401,34 @@ func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, ev
 			ChangeType: ChangeTypeOther,
 		},
 	)
+}
+
+// This is different than inside of handleGoFileChange, because here we
+// assume we need to re-run other build steps too, not just recompile Go.
+// Also, we don't necessarily recompile Go here (we only necessarily) run
+// the other build steps. We only recompile Go if wfc.RecompileBinary is true.
+func runOtherFileBuild(config *common.Config, wfc *common.WatchedFile) error {
+	err := buildtime.SetupNewBuild(config)
+	if err != nil {
+		msg := fmt.Sprintf("error: failed to setup new build: %v", err)
+		util.Log.Errorf(msg)
+		return errors.New(msg)
+	}
+	err = buildtime.RunPrecompileTasks(config)
+	if err != nil {
+		msg := fmt.Sprintf("error: failed to run precompile tasks: %v", err)
+		util.Log.Errorf(msg)
+		return errors.New(msg)
+	}
+	if wfc.RecompileBinary {
+		err = buildtime.CompileBinary(config)
+		if err != nil {
+			msg := fmt.Sprintf("error: failed to recompile binary: %v", err)
+			util.Log.Errorf(msg)
+			return errors.New(msg)
+		}
+	}
+	return nil
 }
 
 func mustReloadBroadcast(config *common.Config, manager *ClientManager, rfp RefreshFilePayload) {
@@ -459,18 +491,15 @@ func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
 	isCssSimple := getIsCss(evt)
 	isCriticalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeCriticalCSS)
 	isNormalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeNormalCSS)
-	isKirunaCss := isCriticalCss || isNormalCss
 	isIgnored := getIsIgnored(evt.Name, &ignoredFilePatterns)
 
 	var matchingWatchedFile *common.WatchedFile
 
-	if !isKirunaCss {
-		for _, wfc := range config.DevConfig.WatchedFiles {
-			isMatch := getIsMatch(wfc.Pattern, evt.Name)
-			if isMatch {
-				matchingWatchedFile = &wfc
-				break
-			}
+	for _, wfc := range config.DevConfig.WatchedFiles {
+		isMatch := getIsMatch(wfc.Pattern, evt.Name)
+		if isMatch {
+			matchingWatchedFile = &wfc
+			break
 		}
 	}
 

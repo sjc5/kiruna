@@ -13,8 +13,6 @@ import (
 
 type Config = common.Config
 type DevConfig = common.DevConfig
-type CSSConfig = common.CSSConfig
-type Extensions = common.Extensions
 
 type Kiruna struct {
 	Config *common.Config
