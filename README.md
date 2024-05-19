@@ -1,128 +1,256 @@
 # 🏔️ Kiruna
 
-### Kiruna is a lightweight dev server, CSS bundler, and static asset build tool for full-stack Go applications.
+## What is Kiruna?
 
-## Features
+Kiruna is a bit like Vite, but for Go. It's a development server and build tool that provides hot CSS reloading, automatic browser refreshes, and automatic server rebuilds during development, and it optimizes your web application for production.
 
-- **🚀 Automatic, optimized server rebuilds and browser refreshes during development**
-- **🎨 Instant, Vite-style CSS hot reloading**
-- **📦 Automatic CSS bunding and static asset hashing / embedding**
-- **📝 Compatible with any Go templating engine**
+## Starter Tutorial From Scratch
 
-## Examples
+---
 
-Check out the [examples repository](https://github.com/sjc5/kiruna-examples) to see how to get started with a minimal Kiruna setup.
+### Scaffolding
 
-## Quick note on project status and documentation quality
+First, let's get Kiruna set up. This only takes a minute or two to complete. Start by running the following commands in an empty directory, replacing `your-module-name` with your own module name:
 
-This project is in alpha stage. Some of the documentation is in comments in the code rather than below. You may need to piece some things together until I get the API finalized and the documentation cleaned up. Definitely feel free to reach out if you have any questions.
+```sh
+go mod init your-module-name
+mkdir -p cmd/app && touch cmd/app/main.go && echo 'package main' > cmd/app/main.go
+mkdir -p cmd/build && touch cmd/build/main.go && echo 'package main' > cmd/build/main.go
+mkdir -p cmd/dev && touch cmd/dev/main.go && echo 'package main' > cmd/dev/main.go
+mkdir -p styles/critical && touch styles/critical/main.css
+mkdir -p styles/normal && touch styles/normal/main.css
+mkdir -p dist/kiruna && touch dist/kiruna/x && touch dist/dist.go && echo "package dist" > dist/dist.go
+mkdir -p static/private && touch static/private/index.go.html
+mkdir -p static/public/__nohash
+mkdir -p internal/platform && touch internal/platform/kiruna.go && echo "package platform" > internal/platform/kiruna.go
+```
 
-## Dev-time browser refreshes and Go application rebuilds
+---
 
-During development, Kiruna will update your browser in the fastest way possible, whether that's by (from fastest to slowest):
+### Setup `dist/dist.go`
 
-1. Hot reloading your CSS with no browser refresh at all;
-2. Hard reloading the browser without rebuilding your server (for example, when you edit a template file); or
-3. Fully rebuilding your Go server and hard reloading the browser.
-
-This is configurable by telling Kiruna which file extensions to watch for changes, and how to handle those changes.
-
-## Template strategy
-
-By default, to get a tight feedback loop while building out your templates, changing a template file will only refresh your browser, and your Go application will not even be restarted. This works great if you parse your templates lazily (e.g., when a request comes in), but not as well if you parse your templates eagerly (e.g., on app startup). If you parse your templates eagerly, set `RestartApp` to `true` in your Kiruna config:
+Now copy this into your `dist/dist.go` file, under the package declaration:
 
 ```go
-// This is just a partial example specific to this topic. There's more to configure besides this.
-&kiruna.Config{
-  DevConfig: &kiruna.DevConfig{
-    WatchedFiles: kiruna.WatchedFiles{
-      ".go.html": {
-        RestartApp: true,
-      },
-    },
-  },
+import (
+	"embed"
+)
+
+//go:embed kiruna
+var FS embed.FS
+```
+
+---
+
+### Setup `internal/platform/kiruna.go`
+
+Now copy this into your `internal/platform/kiruna.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+
+```go
+import (
+	"your-module-name/dist"
+
+	"github.com/sjc5/kiruna"
+)
+
+var Kiruna = kiruna.New(&kiruna.Config{
+	DistFS:     dist.FS,
+	EntryPoint: "cmd/app/main.go",
+})
+```
+
+---
+
+### go get Kiruna
+
+Now go get Kiruna and tidy up:
+
+```sh
+go get github.com/sjc5/kiruna
+go mod tidy
+```
+
+---
+
+### Setup `static/private/index.go.html`
+
+Now copy this into your `static/private/index.go.html` file:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		{{.Kiruna.GetCriticalCSSStyleElement}} {{.Kiruna.GetStyleSheetLinkElement}}
+	</head>
+	<body>
+		<div id="root">
+			<h1>Hello, world!</h1>
+			<p>Hello from "static/private/index.go.html"</p>
+		</div>
+		{{.Kiruna.GetRefreshScript}}
+	</body>
+</html>
+```
+
+---
+
+### Setup `cmd/app/main.go`
+
+And now copy this into your `cmd/app/main.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+
+```go
+import (
+	"fmt"
+	"html/template"
+	"your-module-name/internal/platform"
+	"net/http"
+
+	"github.com/sjc5/kiruna"
+)
+
+func main() {
+	// Health check endpoint
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Serve static files from "dist/kiruna/static/public" directory, accessible at "/public/"
+	http.Handle("/public/", platform.Kiruna.GetServeStaticHandler("/public/", true))
+
+	// Serve an HTML file using html/template
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		FS, err := platform.Kiruna.GetPrivateFS()
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Error loading template", http.StatusInternalServerError)
+			return
+		}
+
+		tmpl, err := template.ParseFS(FS, "index.go.html")
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "Error loading template", http.StatusInternalServerError)
+			return
+		}
+
+		err = tmpl.Execute(w, struct {
+			Kiruna     *kiruna.Kiruna
+			FaviconURL string
+		}{
+			Kiruna:     platform.Kiruna,
+			FaviconURL: platform.Kiruna.GetPublicURL("favicon.ico"),
+		})
+		if err != nil {
+			http.Error(w, "Error executing template", http.StatusInternalServerError)
+		}
+	})
+
+	port := kiruna.MustGetPort()
+
+	fmt.Printf("Starting server on: http://localhost:%d\n", port)
+	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
 ```
 
-Kiruna is built to play nicely with Go's standard `html/template` package, but it should be flexible and unopinionated enough to work with any templating solution you may prefer.
+--
 
-## CSS hot reloading and critical CSS inlining
+### Setup `cmd/build/main.go`
 
-Assuming you follow a few simple conventions expected by the tool, Kiruna provides instant, Vite-style hot reloading for your bundled global CSS and inlined critical CSS. This provides a really great developer experience when iterating on styles.
+And copy this into your `cmd/build/main.go` file, under the package declaration, replacing `your-module-name` with your own module name:
 
-Kiruna also provides a way to mark certain stylesheets as critical, so they can be automatically inlined into your document head.
+```go
+import (
+	"your-module-name/internal/platform"
+)
 
-Here are the conventions. Put a directory called `styles` in your Kiruna `RootDir` (this is probably also your project's root, but it doesn't necessarily have to be). Inside that directory, put two child directories: `critical` and `normal`. Inside of each of those files, you can write an unlimited number of `.css` files, and they will be bundled together (simply concatenated by alphabetical filename order). The bundled critical CSS can be inlined into your document head, and the bundled normal CSS can be served to the client via a standard link tag.
-
-Note that hot reloading (with no browser refresh at all) only works if you write (or otherwise generate/output) your CSS in classic stylesheets, not inside of your markup. If, however, you write CSS in your markup (e.g., Tailwind), you can add in the Tailwind build step as a hook to your build process, and Kiruna will still provide instant browser refreshes when you edit your template file. To have Kiruna wait until Tailwind has finished building before refreshing your browser, you can hook into the build process by passing a custom `OnChange` function to your `WatchedFiles` map in the config.
-
-Note that if you reference a local file in your CSS (e.g., `background-image: url(./my-image.png)`), it will automatically be converted to the hashed version served from your public folder.
-
-## Static asset hashing and embedding
-
-By default, Kiruna copies and hashes all of your static public assets (in `./static/public`), which lets you safely serve them with immutable cache headers, without worrying about asset mismatches or having to do full cache purges on deploy. If you have static assets that you don't want to have hashed, that is supported too; just put them in `./static/public/__nohash` instead of directly in `./static/public`.
-
-Kiruna also handles your static private assets (such as template files or JSON data) in a similar way, but it does not hash them, since they are not served to the client. To have these included in your build, put them in `./static/private`. For example, your index template file might be at `./static/private/templates/index.tmpl`.
-
-For production builds, static assets are embedded into your Go binary, which optimizes runtime performance and simplifies deployment. This will also work for any type of static asset you may want to serve, such as self-vendored JavaScript libraries or fonts. If you prefer to serve your assets from disk, you can do that too.
-
-## Where exactly does Kiruna fit into the application lifecycle?
-
-Kiruna's behavior can be broken down into four categories, with some overlap between them:
-
-1. **Dev buildtime**
-2. **Dev runtime**
-3. **Prod buildtime**
-4. **Prod runtime**
-
-Visualized, you can think of it like this:
-
-| Category        | **_Development_** | **_Production_** |
-| --------------- | ----------------- | ---------------- |
-| **_Buildtime_** | Dev buildtime     | Prod buildtime   |
-| **_Runtime_**   | Dev runtime       | Prod runtime     |
-
-Most behaviors are going to be identical between development and production, but there are some differences, such as the way that static assets are served.
-
-Kiruna knows whether it is in development or production simply by whether it is called via `Kiruna.Dev()` or `Kiruna.Build()`.
-
-Here's a rough overview of what is "special" about each category:
-
-### Dev buildtime
-
-Your development builds are initiated by your dev server, and they get outputted into your `dist` directory (which may be in your project root, or it may be in a sub-directory, depending on how you configure Kiruna). All of your static assets are hashed and copied into this directory, and your CSS is bundled and outputted into this directory as well. Your Go application is also built and outputted into this directory. All of this is identical between development and production, except that in dev the process is initiated by `Kiruna.Dev()` (rather than `Kiruna.Build()`).
-
-Other than those superficial differences, only real difference between dev and prod buildtime is that the Kiruna dev server (which lives in its own process outside of your app and and is responsible for running development builds) will sometimes do only partial rebuilds in order to speed up the development feedback loop. It only does this when it's safe to do so based on how you configure Kiruna. The ability to do only partial rebuilds (for example, very quickly rebuilding your static assets without actually re-compiling your Go app) is possible because in your development _runtime_, your app reads templates and CSS files from disk, rather than from the embedded filesystem. In production, unless you configure it differently, your app reads templates and CSS files from the embedded filesystem, which means the Go app itself would need to be recompiled when you change static assets. The Go compiler is fast, but for certain dev-time changes, we can do better, and that's what the Kiruna dev server orchestrates and handles.
-
-### Dev runtime
-
-There are two "special" things about your development runtime:
-
-1. As mentioned above, your app reads templates and CSS files from disk, so you can change them without rebuilding your app. This is the default behavior, but you can configure it differently if you want.
-
-2. Your root HTML template will include a script tag that connects to the Kiruna dev server, which will allow it to receive messages from the dev server and refresh the browser when necessary, or just hot update the CSS when possible.
-
-### Prod buildtime
-
-Your production builds are identical to your development builds, except that they are manually triggered and have no connection to the Kiruna dev server.
-
-### Prod runtime
-
-Your production runtime is identical to your development runtime, except that your app reads templates and CSS files from the embedded filesystem, so you can't change them without rebuilding your app (this is default, but optional; if you want you can still use the os filesystem in production if you want). Additionally, you will not have the Kiruna dev server script tag in your root HTML template.
-
-## Installation
-
-```bash
-go get -u github.com/sjc5/kiruna
+func main() {
+	err := platform.Kiruna.Build()
+	if err != nil {
+		panic(err)
+	}
+}
 ```
 
-## Dependencies
+---
 
-Kiruna has just a single dependency (`fsnotify`), which is used only at dev-time and will not be included in your final binary.
+### Setup `cmd/dev/main.go`
+
+And copy this into your `cmd/dev/main.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+
+```go
+import (
+	"your-module-name/internal/platform"
+
+	"github.com/sjc5/kiruna"
+)
+
+func main() {
+	platform.Kiruna.MustStartDev(&kiruna.DevConfig{
+		HealthcheckEndpoint: "/healthz",
+		WatchedFiles:        kiruna.WatchedFiles{{Pattern: "**/*.go.html"}},
+	})
+}
+```
+
+---
+
+### Run the dev server
+
+Now try running the dev server:
+
+```sh
+go run ./cmd/dev
+```
+
+If you copied everything correctly, you should see some logging, with a link to your site on localhost, either at port 8080 or some fallback port. If you see an error, double check that you copied everything correctly.
+
+---
+
+### Edit critical CSS
+
+Now paste the following into your `styles/critical/main.css` file, and hit save:
+
+```css
+body {
+	background-color: darkblue;
+	color: white;
+}
+```
+
+If you leave your browser open and your dev server running, you should see the changes reflected in your browser nearly instantly via hot CSS reloading. Notice that the CSS above is being inlined into your document head. This is because it is in the `styles/critical` directory.
+
+---
+
+### Edit normal CSS
+
+Now let's make sure your normal stylesheet is also working. Copy this into your `styles/normal/main.css` file:
+
+```css
+h1 {
+	color: red;
+}
+```
+
+When you hit save, this should also hot reload. Note that you can put multiple css stylesheets into both the `styles/critical` and `styles/normal` directories. In each case, the CSS files will be minified and concatenated in alphabetical order by filename.
+
+---
+
+### Edit your html template
+
+Now let's try editing your html template at `static/private/index.go.html`.
+
+Find the line that says `<h1>Hello, world!</h1>` (line 10) and change it to: `<h1 style="color: green;">Hello, world!</h1>`.
+
+When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you removed that item, the page would not reload when you save your html file.
+
+When you want to watch different file types, you can add them to this slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more.
 
 ## Open source / closed contribution
 
-For simplicity and reduced support load, Kiruna is currently open source / closed contribution. This may change in the future, but no promises.
+For simplicity and reduced support load, especially while Kiruna is in active early development, Kiruna is currently open source / closed contribution. This may change in the future, but no promises.
 
 ## Copyright and License
 

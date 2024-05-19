@@ -42,7 +42,12 @@ es.onmessage = (e) => {
 		el.style.textShadow = "2px 2px 2px #000";
 		el.style.justifyContent = "center";
 		el.style.alignItems = "center";
+		el.style.opacity = "0";
+		el.style.transition = "opacity 0.3s";
 		document.body.appendChild(el);
+		setTimeout(() => {
+			el.style.opacity = "1";
+		}, 70);
 	}
 	if (changeType == "other") {
 		const scrollY = window.scrollY;

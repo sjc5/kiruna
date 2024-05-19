@@ -14,9 +14,8 @@ const StyleSheetElementID = "__normal-css"
 var styleSheetURLCacheMap = make(map[*common.Config]string)
 
 func GetStyleSheetURL(config *common.Config) string {
-	cachedURL, isCached := styleSheetURLCacheMap[config]
-	if isCached {
-		return cachedURL
+	if hit, isCached := styleSheetURLCacheMap[config]; isCached && !common.KirunaEnv.GetIsDev() {
+		return hit
 	}
 
 	fs, err := GetUniversalFS(config)
@@ -40,9 +39,8 @@ func GetStyleSheetURL(config *common.Config) string {
 var styleSheetElementCacheMap = make(map[*common.Config]template.HTML)
 
 func GetStyleSheetLinkElement(config *common.Config) template.HTML {
-	cachedEl, isCached := styleSheetElementCacheMap[config]
-	if isCached {
-		return cachedEl
+	if hit, isCached := styleSheetElementCacheMap[config]; isCached && !common.KirunaEnv.GetIsDev() {
+		return hit
 	}
 
 	url := GetStyleSheetURL(config)
