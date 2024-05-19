@@ -6,8 +6,6 @@ Kiruna is a bit like Vite, but for Go. It's a development server and build tool 
 
 ## Starter Tutorial From Scratch
 
----
-
 ### Scaffolding
 
 First, let's get Kiruna set up. This only takes a minute or two to complete. Start by running the following commands in an empty directory, replacing `your-module-name` with your own module name:
@@ -155,7 +153,7 @@ func main() {
 }
 ```
 
---
+---
 
 ### Setup `cmd/build/main.go`
 
@@ -205,7 +203,7 @@ Now try running the dev server:
 go run ./cmd/dev
 ```
 
-If you copied everything correctly, you should see some logging, with a link to your site on localhost, either at port 8080 or some fallback port. If you see an error, double check that you copied everything correctly.
+If you copied everything correctly, you should see some logging, with a link to your site on localhost, either at port `8080` or some fallback port. If you see an error, double check that you copied everything correctly.
 
 ---
 
@@ -234,7 +232,7 @@ h1 {
 }
 ```
 
-When you hit save, this should also hot reload. Note that you can put multiple css stylesheets into both the `styles/critical` and `styles/normal` directories. In each case, the CSS files will be minified and concatenated in alphabetical order by filename.
+When you hit save, this should also hot reload. Note that you can put multiple css stylesheets into both the `styles/critical` and `styles/normal` directories. In each case, the CSS will be minified and concatenated in alphabetical order by filename.
 
 ---
 
@@ -244,9 +242,9 @@ Now let's try editing your html template at `static/private/index.go.html`.
 
 Find the line that says `<h1>Hello, world!</h1>` (line 10) and change it to: `<h1 style="color: green;">Hello, world!</h1>`.
 
-When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you removed that item, the page would not reload when you save your html file.
+When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you removed that item, the page would not reload when you save your html file (if you don't believe me, go give it a try).
 
-When you want to watch different file types, you can add them to this slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more.
+When you want to watch different file types, you can add them to the `kiruna.WatchedFiles` slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more. Feel free to explore your auto-complete options here or dive into the Kiruna source code to learn more.
 
 ## Open source / closed contribution
 
@@ -258,8 +256,8 @@ Copyright 2024 Samuel J. Cook. Licensed under the BSD 3-Clause License.
 
 ## Alternatives
 
-If you're just looking for automatic Go application rebuilds only, without automatic browser refreshes or static asset build tooling, then Kiruna may be overkill for you, and you could just use [Air](https://github.com/cosmtrek/air) instead.
+If you're just looking for automatic Go application rebuilds only, without automatic browser refreshes or static asset build tooling, then Kiruna may be overkill for you, and you could just use <a href="https://github.com/cosmtrek/air" target="_blank">Air</a> instead.
 
 That said, you can put Kiruna into a simpler `ServerOnly` mode if you want. This will disable all of the CSS and static asset build tooling, and it will only do automatic Go application rebuilds _a la_ Air.
 
-One benefit (or downside, depending on your perspective) of Kiruna is that it doesn't require you to install any tooling on your machine. It just is orchestrated solely from inside your repo and its dependencies. So when a new developer joins your team, they can just clone your repo and be ready to rock as soon as they run `go mod tidy`, instead of needing to go install and configure Air.
+One benefit of Kiruna over Air is that it doesn't require you to install any tooling on your machine. It just is orchestrated solely from inside your repo and its dependencies. So when a new developer joins your team, they can just clone your repo and be ready to rock as soon as they run `go mod tidy`, instead of needing to install and configure Air first.
