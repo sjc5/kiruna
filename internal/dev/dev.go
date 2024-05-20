@@ -12,6 +12,9 @@ import (
 )
 
 const defaultFreePort = 10_000
+const healthCheckWarningA = `WARNING: No healthcheck endpoint found, setting to "/".`
+const healthCheckWarningB = `To set this explicitly, use the "HealthcheckEndpoint" field in your dev config.`
+const healthCheckWarning = healthCheckWarningA + "\n" + healthCheckWarningB
 
 func MustStartDev(config *common.Config) {
 	// Short circuit if no dev config
@@ -19,6 +22,11 @@ func MustStartDev(config *common.Config) {
 		errMsg := "error: no dev config found"
 		util.Log.Error(errMsg)
 		panic(errMsg)
+	}
+
+	if len(config.DevConfig.HealthcheckEndpoint) == 0 {
+		util.Log.Warning(healthCheckWarning)
+		config.DevConfig.HealthcheckEndpoint = "/"
 	}
 
 	common.KirunaEnv.SetModeToDev()

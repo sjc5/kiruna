@@ -17,7 +17,7 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-var ignoredDirPatterns = []string{".git", "node_modules", "dist/bin", "dist/kiruna"}
+var ignoredDirPatterns = []string{"**/.git", "**/node_modules", "**/dist/bin", "**/dist/kiruna"}
 var ignoredFilePatterns = []string{}
 
 func mustSetupWatcher(manager *ClientManager, config *common.Config) {
@@ -56,13 +56,20 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 		case evt := <-watcher.Events:
 			time.Sleep(10 * time.Millisecond) // let the file system settle
 
-			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
-				if fileInfo, err := os.Stat(evt.Name); err == nil && fileInfo.IsDir() {
+			fileInfo, err := os.Stat(evt.Name)
+			if err != nil {
+				continue
+			}
+
+			if fileInfo.IsDir() {
+				if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
 					if err := addDirs(watcher, evt.Name); err != nil {
 						util.Log.Errorf("error: failed to add directory to watcher: %v", err)
-						return
+						continue
 					}
 				}
+
+				continue
 			}
 
 			evtDetails := getEvtDetails(config, evt)
@@ -70,24 +77,9 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 				continue
 			}
 
-			if getIsGo(evt) {
-				if evtDetails.matchingWatchedFile != nil && evtDetails.matchingWatchedFile.TreatAsNonGo {
-					mustHandleOtherFileChange(config, manager, evt, evtDetails)
-					continue
-				}
-				mustHandleGoFileChange(config, manager, evt, evtDetails)
-				continue
-			}
-
-			if !config.DevConfig.ServerOnly {
-				switch {
-				case evtDetails.isCriticalCss:
-					mustHandleCSSFileChange(config, manager, evt, evtDetails, ChangeTypeCriticalCSS)
-				case evtDetails.isNormalCss:
-					mustHandleCSSFileChange(config, manager, evt, evtDetails, ChangeTypeNormalCSS)
-				case evtDetails.matchingWatchedFile != nil:
-					mustHandleOtherFileChange(config, manager, evt, evtDetails)
-				}
+			err = mustHandleFileChange(config, manager, evt, evtDetails)
+			if err != nil {
+				util.Log.Errorf("error: failed to handle file change: %v", err)
 			}
 
 		case err := <-watcher.Errors:
@@ -174,233 +166,10 @@ func simpleRunOnChangeCallbacks(onChanges []common.OnChange, evtName string) {
 	}
 }
 
-func mustHandleGoFileChange(
-	config *common.Config,
-	manager *ClientManager,
-	evt fsnotify.Event,
-	evtDetails EvtDetails,
-) {
-	if getIsNonEmptyCHMODOnly(evt) {
-		return
-	}
-
-	if !config.DevConfig.ServerOnly {
-		manager.broadcast <- RefreshFilePayload{
-			ChangeType: ChangeTypeRebuilding,
-		}
-	}
-
-	wfc := evtDetails.matchingWatchedFile
-	if wfc == nil {
-		wfc = &common.WatchedFile{}
-	}
-
-	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
-
-	var buildErr error
-
-	if sortedOnChanges.exists {
-		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
-
-		// You would do this if you want to trigger a process that itself
-		// saves to a file (evt.g., to styles/critical/whatever.css) that
-		// would in turn trigger the rebuild in another run
-		if wfc.RunOnChangeOnly {
-			util.Log.Infof("ran applicable onChange callbacks")
-			return
-		}
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			buildErr = buildtime.CompileBinary(config)
-		}()
-
-		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
-		wg.Wait()
-	} else {
-		buildErr = buildtime.CompileBinary(config)
-	}
-
-	if buildErr != nil {
-		util.Log.Errorf("error: failed to build app: %v", buildErr)
-		return
-	}
-
-	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
-
-	mustKillAndRestart(config)
-
-	if !config.DevConfig.ServerOnly {
-		util.Log.Infof("hard reloading browser")
-		mustReloadBroadcast(
-			config,
-			manager,
-			RefreshFilePayload{
-				ChangeType: ChangeTypeOther,
-			},
-		)
-	}
-}
-
 func mustKillAndRestart(config *common.Config) {
 	util.Log.Infof("killing and restarting app")
 	mustKillAppDev()
 	mustStartAppDev(config)
-}
-
-func mustHandleCSSFileChange(
-	config *common.Config,
-	manager *ClientManager,
-	evt fsnotify.Event,
-	evtDetails EvtDetails,
-	cssType ChangeType,
-) {
-	if getIsNonEmptyCHMODOnly(evt) {
-		return
-	}
-
-	var cssBuildErr error
-
-	wfc := evtDetails.matchingWatchedFile
-	if wfc == nil {
-		wfc = &common.WatchedFile{}
-	}
-
-	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
-
-	if sortedOnChanges.exists {
-		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
-
-		if wfc.RunOnChangeOnly {
-			util.Log.Infof("ran applicable onChange callbacks")
-			return
-		}
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if wfc.RecompileBinary || wfc.RestartApp {
-				cssBuildErr = runOtherFileBuild(config, wfc)
-			} else {
-				cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
-			}
-		}()
-
-		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
-		wg.Wait()
-	} else {
-		if wfc.RecompileBinary || wfc.RestartApp {
-			cssBuildErr = runOtherFileBuild(config, wfc)
-		} else {
-			cssBuildErr = buildtime.ProcessCSS(config, string(cssType))
-		}
-	}
-
-	if cssBuildErr != nil {
-		util.Log.Errorf("error: failed to process %s CSS: %v", cssType, cssBuildErr)
-		return
-	}
-
-	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
-
-	if wfc.RecompileBinary || wfc.RestartApp {
-		mustKillAndRestart(config)
-		util.Log.Infof("hard reloading browser")
-		mustReloadBroadcast(
-			config,
-			manager,
-			RefreshFilePayload{
-				ChangeType: ChangeTypeOther,
-			},
-		)
-		return
-	}
-
-	util.Log.Infof("modified: %s", evt.Name)
-	util.Log.Infof("hot reloading browser")
-	mustReloadBroadcast(
-		config,
-		manager,
-		RefreshFilePayload{
-			ChangeType: cssType,
-
-			// These must be called AFTER ProcessCSS
-			CriticalCSS:  runtime.GetCriticalCSS(config),
-			NormalCSSURL: runtime.GetStyleSheetURL(config),
-		},
-	)
-}
-
-func mustHandleOtherFileChange(config *common.Config, manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails) {
-	if getIsNonEmptyCHMODOnly(evt) {
-		return
-	}
-
-	wfc := evtDetails.matchingWatchedFile
-	if wfc == nil {
-		return
-	}
-
-	if !wfc.SkipRebuildingNotification {
-		manager.broadcast <- RefreshFilePayload{
-			ChangeType: ChangeTypeRebuilding,
-		}
-		util.Log.Infof("modified: %s, rebuilding static assets", evt.Name)
-	}
-
-	if wfc.RecompileBinary {
-		util.Log.Infof("doing a full recompile")
-	} else {
-		util.Log.Infof("skipping full recompile")
-	}
-
-	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
-
-	var buildErr error
-
-	if sortedOnChanges.exists {
-		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
-
-		if wfc.RunOnChangeOnly {
-			util.Log.Infof("ran applicable onChange callbacks")
-			return
-		}
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			buildErr = runOtherFileBuild(config, wfc)
-		}()
-
-		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
-		wg.Wait()
-	} else {
-		buildErr = runOtherFileBuild(config, wfc)
-	}
-
-	if buildErr != nil {
-		util.Log.Errorf("error: failed to build app: %v", buildErr)
-		return
-	}
-
-	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
-
-	if wfc.RecompileBinary || wfc.RestartApp {
-		mustKillAndRestart(config)
-	}
-
-	util.Log.Infof("hard reloading browser")
-	mustReloadBroadcast(
-		config,
-		manager,
-		RefreshFilePayload{
-			ChangeType: ChangeTypeOther,
-		},
-	)
 }
 
 // This is different than inside of handleGoFileChange, because here we
@@ -461,8 +230,11 @@ func addDirs(watcher *fsnotify.Watcher, path string) error {
 
 type EvtDetails struct {
 	isIgnored           bool
-	isCriticalCss       bool
-	isNormalCss         bool
+	isGo                bool
+	isOther             bool
+	isCriticalCSS       bool
+	isNormalCSS         bool
+	isKirunaCSS         bool
 	matchingWatchedFile *common.WatchedFile
 }
 
@@ -488,10 +260,10 @@ func getIsMatch(pattern string, path string) bool {
 }
 
 func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
-	isCssSimple := getIsCss(evt)
-	isCriticalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeCriticalCSS)
-	isNormalCss := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeNormalCSS)
-	isIgnored := getIsIgnored(evt.Name, &ignoredFilePatterns)
+	isCssSimple := filepath.Ext(evt.Name) == ".css"
+	isCriticalCSS := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeCriticalCSS)
+	isNormalCSS := isCssSimple && getIsCssEvtType(config, evt, ChangeTypeNormalCSS)
+	isKirunaCSS := isCriticalCSS || isNormalCSS
 
 	var matchingWatchedFile *common.WatchedFile
 
@@ -503,20 +275,27 @@ func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
 		}
 	}
 
+	isGo := filepath.Ext(evt.Name) == ".go"
+	if isGo && matchingWatchedFile != nil && matchingWatchedFile.TreatAsNonGo {
+		isGo = false
+	}
+
+	isOther := !isGo && !isKirunaCSS
+
+	isIgnored := getIsIgnored(evt.Name, &ignoredFilePatterns)
+	if isOther && matchingWatchedFile == nil {
+		isIgnored = true
+	}
+
 	return EvtDetails{
+		isOther:             isOther,
+		isKirunaCSS:         isKirunaCSS,
+		isGo:                isGo,
 		isIgnored:           isIgnored,
-		isCriticalCss:       isCriticalCss,
-		isNormalCss:         isNormalCss,
+		isCriticalCSS:       isCriticalCSS,
+		isNormalCSS:         isNormalCSS,
 		matchingWatchedFile: matchingWatchedFile,
 	}
-}
-
-func getIsCss(evt fsnotify.Event) bool {
-	return filepath.Ext(evt.Name) == ".css"
-}
-
-func getIsGo(evt fsnotify.Event) bool {
-	return filepath.Ext(evt.Name) == ".go"
 }
 
 func getIsCssEvtType(config *common.Config, evt fsnotify.Event, cssType ChangeType) bool {
@@ -544,4 +323,127 @@ func getIsEmptyFile(evt fsnotify.Event) bool {
 
 func getIsNonEmptyCHMODOnly(evt fsnotify.Event) bool {
 	return getIsSolelyCHMOD(evt) && !getIsEmptyFile(evt)
+}
+
+func callback(config *common.Config, wfc *common.WatchedFile, evtDetails EvtDetails) error {
+	if evtDetails.isGo {
+		return buildtime.CompileBinary(config)
+	}
+
+	if evtDetails.isKirunaCSS {
+		if wfc.RecompileBinary || wfc.RestartApp {
+			return runOtherFileBuild(config, wfc)
+		}
+		cssType := ChangeTypeNormalCSS
+		if evtDetails.isCriticalCSS {
+			cssType = ChangeTypeCriticalCSS
+		}
+		return buildtime.ProcessCSS(config, string(cssType))
+	}
+
+	return runOtherFileBuild(config, wfc)
+}
+
+func mustHandleFileChange(
+	config *common.Config,
+	manager *ClientManager,
+	evt fsnotify.Event,
+	evtDetails EvtDetails,
+) error {
+	if getIsNonEmptyCHMODOnly(evt) {
+		return nil
+	}
+
+	wfc := evtDetails.matchingWatchedFile
+	if wfc == nil {
+		wfc = &common.WatchedFile{}
+	}
+
+	if !config.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS {
+		manager.broadcast <- RefreshFilePayload{
+			ChangeType: ChangeTypeRebuilding,
+		}
+	}
+
+	util.Log.Infof("modified: %s", evt.Name)
+
+	if evtDetails.isGo || wfc.RecompileBinary {
+		util.Log.Infof("recompiling binary")
+	}
+
+	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
+
+	var buildErr error
+
+	if sortedOnChanges.exists {
+		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+
+		if wfc.RunOnChangeOnly {
+			util.Log.Infof("ran applicable onChange callbacks")
+			return nil
+		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			buildErr = callback(config, wfc, evtDetails)
+		}()
+
+		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
+		wg.Wait()
+	} else {
+		buildErr = callback(config, wfc, evtDetails)
+	}
+
+	if buildErr != nil {
+		util.Log.Errorf("error: failed to build: %v", buildErr)
+		return buildErr
+	}
+
+	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
+
+	needsHardReloadEvenIfNonGo := wfc.RecompileBinary || wfc.RestartApp
+
+	if evtDetails.isGo || needsHardReloadEvenIfNonGo {
+		mustKillAndRestart(config)
+	}
+
+	if config.DevConfig.ServerOnly {
+		return nil
+	}
+
+	if !evtDetails.isKirunaCSS || needsHardReloadEvenIfNonGo {
+		util.Log.Infof("hard reloading browser")
+		mustReloadBroadcast(
+			config,
+			manager,
+			RefreshFilePayload{
+				ChangeType: ChangeTypeOther,
+			},
+		)
+		return nil
+	}
+
+	// At this point, we know it's a CSS file
+
+	cssType := ChangeTypeNormalCSS
+	if evtDetails.isCriticalCSS {
+		cssType = ChangeTypeCriticalCSS
+	}
+
+	util.Log.Infof("hot reloading browser")
+	mustReloadBroadcast(
+		config,
+		manager,
+		RefreshFilePayload{
+			ChangeType: cssType,
+
+			// These must be called AFTER ProcessCSS
+			CriticalCSS:  runtime.GetCriticalCSS(config),
+			NormalCSSURL: runtime.GetStyleSheetURL(config),
+		},
+	)
+
+	return nil
 }

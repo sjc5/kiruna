@@ -57,13 +57,10 @@ type IgnorePatterns struct {
 }
 
 type DevConfig struct {
-	// REQUIRED
-	HealthcheckEndpoint string // e.g., "/healthz" -- should return 200 OK if healthy
-
-	// OPTIONAL
-	WatchedFiles   WatchedFiles
-	IgnorePatterns IgnorePatterns // Glob patterns
-	ServerOnly     bool
+	HealthcheckEndpoint string // e.g., "/healthz" -- should return 200 OK if healthy -- defaults to "/"
+	WatchedFiles        WatchedFiles
+	IgnorePatterns      IgnorePatterns
+	ServerOnly          bool
 }
 
 const OnChangeStrategyPre = "pre"

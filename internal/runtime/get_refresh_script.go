@@ -43,11 +43,11 @@ es.onmessage = (e) => {
 		el.style.justifyContent = "center";
 		el.style.alignItems = "center";
 		el.style.opacity = "0";
-		el.style.transition = "opacity 0.3s";
+		el.style.transition = "opacity 0.05s";
 		document.body.appendChild(el);
 		setTimeout(() => {
 			el.style.opacity = "1";
-		}, 70);
+		}, 10);
 	}
 	if (changeType == "other") {
 		const scrollY = window.scrollY;

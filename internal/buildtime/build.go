@@ -9,6 +9,8 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 )
 
+// __TODO -- in dev, can probably make these more granular to avoid unnecessary disk writes
+
 func SetupNewBuild(config *common.Config) error {
 	cleanRootDir := config.GetCleanRootDir()
 	// nuke the dist/kiruna directory
