@@ -272,7 +272,7 @@ Now let's try editing your html template at `static/private/index.go.html`.
 
 Find the line that says `<h1>Hello, world!</h1>` (line 10) and change it to: `<h1 style="color: green;">Hello, world!</h1>`.
 
-When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you removed that item, the page would not reload when you save your html file (if you don't believe me, go give it a try).
+When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you were to remove that item, the page would not reload when you save your html file (if you don't believe me, go give it a try).
 
 When you want to watch different file types, you can add them to the `kiruna.WatchedFiles` slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more. Feel free to explore your auto-complete options here or dive into the Kiruna source code to learn more.
 
