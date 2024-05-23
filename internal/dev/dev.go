@@ -43,7 +43,7 @@ func MustStartDev(config *common.Config) {
 		panic(err)
 	}
 
-	err := buildtime.Build(config, false)
+	err := buildtime.Build(config, false, false)
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to build app: %v", err)
 		util.Log.Error(errMsg)

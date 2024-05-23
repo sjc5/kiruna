@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	PublicFileMapGobName = "public_file_map.gob"
-	CSSNormalDirName     = "normal"
-	CSSCriticalDirName   = "critical"
+	PublicFileMapGobName  = "public_file_map.gob"
+	PrivateFileMapGobName = "private_file_map.gob"
+	CSSNormalDirName      = "normal"
+	CSSCriticalDirName    = "critical"
 )
 
 type Callback func() error
@@ -75,7 +76,6 @@ type OnChange struct {
 	ExcludedPatterns []string // Glob patterns
 }
 
-// __TODO -- make sure all of these config options work across (i) Go, (ii) Kiruna CSS, and (iii) other files
 type WatchedFile struct {
 	Pattern string // Glob pattern
 

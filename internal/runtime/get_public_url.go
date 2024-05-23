@@ -21,7 +21,7 @@ func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool
 	}
 
 	if fileMapFromGlobCacheMap[fileMapKey] == nil {
-		fileMapFromGob, err := loadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
+		fileMapFromGob, err := LoadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
 		if err != nil {
 			util.Log.Errorf("error loading file map from gob: %v", err)
 			return originalPublicURL

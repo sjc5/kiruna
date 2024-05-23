@@ -1,13 +1,14 @@
 package runtime
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
-	"github.com/sjc5/kit/pkg/executil"
 )
 
 const fsTypeDev = "dev"
@@ -69,11 +70,19 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
 	util.Log.Infof("using disk file system (production)")
-	execDir, err := executil.GetExecutableDir()
+	execDir, err := getExecutableDir()
 	if err != nil {
 		return nil, err
 	}
 	fs := newUniversalFS(os.DirFS(execDir))
 	uniFSCacheMap[config] = fs // cache the fs
 	return fs, nil
+}
+
+func getExecutableDir() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("error getting executable path: %v", err)
+	}
+	return filepath.Dir(execPath), nil
 }

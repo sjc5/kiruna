@@ -2,22 +2,40 @@
 
 ## What is Kiruna?
 
-Kiruna is a bit like Vite, but for Go.
+Kiruna is an optimizing build tool and live refresh dev server for building full-stack Go applications. You can think of it as being a lot like Vite, but for Go.
 
-It's a development server and build tool that provides hot CSS reloading, automatic browser refreshes, and automatic server rebuilds during development, and it optimizes your web application for production, including static file hashing and embedding and CSS minification.
+### Dev server features
+
+- Automatic rebuilds and browser refreshes
+- Instant hot reloading for CSS files (without a full page refresh)
+
+### Production optimizations
+
+- Static asset hashing and embedding
+- CSS bundling and minification
+- Critical CSS inlining
+
+Kiruna's static asset hashing strategy allows you to serve public static assets with immutable caching headers.
 
 Dev-time reloads are smart and fast. Based on the type of file you edit and your associated configuration options, Kiruna will do the minimum amount of work necessary to get your changes to your browser as quickly as possible.
 
-Runtime helpers (e.g., `Kiruna.GetPublicURL("favicon.ico")`) make it easy to reference your static assets in your Go code and templates, and the `Kiruna.GetCriticalCSSStyleElement` and `Kiruna.GetStyleSheetLinkElement` helpers make it easy to include your CSS in your HTML templates. They are lightweight and, whenever possible, cached, so you don't have to worry about performance.
+Kiruna has a few lightweight runtime helpers for referencing hashed static assets from Go code and templates (e.g., `Kiruna.GetPublicURL("favicon.ico")`) and for including your CSS in your HTML templates (e.g., `Kiruna.GetCriticalCSSStyleElement()`, `Kiruna.GetStyleSheetLinkElement()`). They have zero third-party dependencies are aggressively cached whenever possible, so you can feel free to call them even in the hot path of your application without much worry.
 
-## Starter Tutorial From Scratch
+## Starter Tutorial From Scratch (~5 minutes)
+
+Let's get a Kiruna project set up from scratch. This should only take a few minutes to complete. The only prerequisite is that you have Go installed on your machine.
 
 ### Scaffolding
 
-First, let's get Kiruna set up. This only takes a minute or two to complete. Start by running the following commands in an empty directory, replacing `your-module-name` with your own module name:
+Start by initializing a new Go module in an empty directory, replacing `your-module-name` with your own module name:
 
 ```sh
 go mod init your-module-name
+```
+
+Then run the following commands to create the necessary directories and files for your project:
+
+```sh
 mkdir -p cmd/app && touch cmd/app/main.go && echo 'package main' > cmd/app/main.go
 mkdir -p cmd/build && touch cmd/build/main.go && echo 'package main' > cmd/build/main.go
 mkdir -p cmd/dev && touch cmd/dev/main.go && echo 'package main' > cmd/dev/main.go

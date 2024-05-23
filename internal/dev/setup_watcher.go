@@ -17,13 +17,25 @@ import (
 	"github.com/sjc5/kiruna/internal/util"
 )
 
-var ignoredDirPatterns = []string{"**/.git", "**/node_modules", "**/dist/bin", "**/dist/kiruna"}
+var naiveIgnoreDirPatterns = [4]string{"**/.git", "**/node_modules", "dist/bin", "dist/kiruna"}
+var ignoredDirPatterns = []string{}
 var ignoredFilePatterns = []string{}
+var defaultWatchedFiles = []common.WatchedFile{}
 
 func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 	defer mustKillAppDev()
+	cleanRootDir := config.GetCleanRootDir()
+
+	for _, p := range naiveIgnoreDirPatterns {
+		ignoredDirPatterns = append(ignoredDirPatterns, filepath.Join(cleanRootDir, p))
+	}
 	ignoredDirPatterns = append(ignoredDirPatterns, config.DevConfig.IgnorePatterns.Dirs...)
 	ignoredFilePatterns = append(ignoredFilePatterns, config.DevConfig.IgnorePatterns.Files...)
+
+	defaultWatchedFiles = append(defaultWatchedFiles, common.WatchedFile{
+		Pattern: filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
+	})
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to create watcher: %v", err)
@@ -56,19 +68,14 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 		case evt := <-watcher.Events:
 			time.Sleep(10 * time.Millisecond) // let the file system settle
 
-			fileInfo, err := os.Stat(evt.Name)
-			if err != nil {
-				continue
-			}
-
-			if fileInfo.IsDir() {
+			fileInfo, _ := os.Stat(evt.Name) // no need to check error, because we want to process either way
+			if fileInfo != nil && fileInfo.IsDir() {
 				if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
 					if err := addDirs(watcher, evt.Name); err != nil {
 						util.Log.Errorf("error: failed to add directory to watcher: %v", err)
 						continue
 					}
 				}
-
 				continue
 			}
 
@@ -77,7 +84,7 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 				continue
 			}
 
-			err = mustHandleFileChange(config, manager, evt, evtDetails)
+			err := mustHandleFileChange(config, manager, evt, evtDetails)
 			if err != nil {
 				util.Log.Errorf("error: failed to handle file change: %v", err)
 			}
@@ -177,25 +184,11 @@ func mustKillAndRestart(config *common.Config) {
 // Also, we don't necessarily recompile Go here (we only necessarily) run
 // the other build steps. We only recompile Go if wfc.RecompileBinary is true.
 func runOtherFileBuild(config *common.Config, wfc *common.WatchedFile) error {
-	err := buildtime.SetupNewBuild(config)
+	err := buildtime.Build(config, wfc.RecompileBinary, true)
 	if err != nil {
-		msg := fmt.Sprintf("error: failed to setup new build: %v", err)
-		util.Log.Errorf(msg)
+		msg := fmt.Sprintf("error: failed to build app: %v", err)
+		util.Log.Error(msg)
 		return errors.New(msg)
-	}
-	err = buildtime.RunPrecompileTasks(config)
-	if err != nil {
-		msg := fmt.Sprintf("error: failed to run precompile tasks: %v", err)
-		util.Log.Errorf(msg)
-		return errors.New(msg)
-	}
-	if wfc.RecompileBinary {
-		err = buildtime.CompileBinary(config)
-		if err != nil {
-			msg := fmt.Sprintf("error: failed to recompile binary: %v", err)
-			util.Log.Errorf(msg)
-			return errors.New(msg)
-		}
 	}
 	return nil
 }
@@ -275,6 +268,16 @@ func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
 		}
 	}
 
+	if matchingWatchedFile == nil {
+		for _, wfc := range defaultWatchedFiles {
+			isMatch := getIsMatch(wfc.Pattern, evt.Name)
+			if isMatch {
+				matchingWatchedFile = &wfc
+				break
+			}
+		}
+	}
+
 	isGo := filepath.Ext(evt.Name) == ".go"
 	if isGo && matchingWatchedFile != nil && matchingWatchedFile.TreatAsNonGo {
 		isGo = false
@@ -302,10 +305,6 @@ func getIsCssEvtType(config *common.Config, evt fsnotify.Event, cssType ChangeTy
 	return strings.HasPrefix(evt.Name, filepath.Join(config.GetCleanRootDir(), "styles/"+string(cssType)))
 }
 
-func getIsSolelyCHMOD(evt fsnotify.Event) bool {
-	return !evt.Has(fsnotify.Write) && !evt.Has(fsnotify.Create) && !evt.Has(fsnotify.Remove) && !evt.Has(fsnotify.Rename)
-}
-
 func getIsEmptyFile(evt fsnotify.Event) bool {
 	file, err := os.Open(evt.Name)
 	if err != nil {
@@ -322,7 +321,8 @@ func getIsEmptyFile(evt fsnotify.Event) bool {
 }
 
 func getIsNonEmptyCHMODOnly(evt fsnotify.Event) bool {
-	return getIsSolelyCHMOD(evt) && !getIsEmptyFile(evt)
+	isSolelyCHMOD := !evt.Has(fsnotify.Write) && !evt.Has(fsnotify.Create) && !evt.Has(fsnotify.Remove) && !evt.Has(fsnotify.Rename)
+	return isSolelyCHMOD && !getIsEmptyFile(evt)
 }
 
 func callback(config *common.Config, wfc *common.WatchedFile, evtDetails EvtDetails) error {

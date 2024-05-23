@@ -8,7 +8,7 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 )
 
-func loadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (map[string]string, error) {
+func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (map[string]string, error) {
 	var FS *UniversalFS
 	var err error
 	if useDirFS {

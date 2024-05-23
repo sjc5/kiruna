@@ -4,36 +4,34 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/sjc5/kiruna/internal/common"
 )
 
-// __TODO -- in dev, can probably make these more granular to avoid unnecessary disk writes
-
-func SetupNewBuild(config *common.Config) error {
+func Build(config *common.Config, recompileBinary bool, shouldBeGranular bool) error {
 	cleanRootDir := config.GetCleanRootDir()
-	// nuke the dist/kiruna directory
-	err := os.RemoveAll(filepath.Join(cleanRootDir, "dist", "kiruna"))
-	if err != nil {
-		return fmt.Errorf("error removing dist/kiruna directory: %v", err)
-	}
-	// re-make required directories
-	isServerOnly := config.DevConfig != nil && config.DevConfig.ServerOnly
-	if !isServerOnly {
-		err = SetupDistDir(config.RootDir)
-	}
-	if err != nil {
-		return fmt.Errorf("error making requisite directories: %v", err)
-	}
-	return nil
-}
 
-func RunPrecompileTasks(config *common.Config) error {
-	cleanRootDir := config.GetCleanRootDir()
+	if !shouldBeGranular {
+		// nuke the dist/kiruna directory
+		err := os.RemoveAll(filepath.Join(cleanRootDir, "dist", "kiruna"))
+		if err != nil {
+			return fmt.Errorf("error removing dist/kiruna directory: %v", err)
+		}
+
+		// re-make required directories
+		isServerOnly := config.DevConfig != nil && config.DevConfig.ServerOnly
+		if !isServerOnly {
+			err = SetupDistDir(config.RootDir)
+			if err != nil {
+				return fmt.Errorf("error making requisite directories: %v", err)
+			}
+		}
+	}
 
 	// Must be complete before BuildCSS in case the CSS references any public files
-	err := handlePublicFiles(cleanRootDir)
+	err := handlePublicFiles(config, shouldBeGranular)
 	if err != nil {
 		return fmt.Errorf("error handling public files: %v", err)
 	}
@@ -45,10 +43,11 @@ func RunPrecompileTasks(config *common.Config) error {
 	// goroutine 1
 	go func() {
 		defer wg.Done()
-		if err = copyPrivateFiles(cleanRootDir); err != nil {
+		if err = copyPrivateFiles(config, shouldBeGranular); err != nil {
 			errChan <- PrecompileError{task: "copyPrivateFiles", err: err}
 		}
 	}()
+
 	// goroutine 2
 	go func() {
 		defer wg.Done()
@@ -68,6 +67,12 @@ func RunPrecompileTasks(config *common.Config) error {
 		}
 	}
 
+	if recompileBinary {
+		err = CompileBinary(config)
+		if err != nil {
+			return fmt.Errorf("error compiling binary: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -81,20 +86,26 @@ func (e PrecompileError) Error() string {
 	return fmt.Sprintf("error during precompile task %s: %v", e.task, e.err)
 }
 
-func Build(config *common.Config, recompileBinary bool) error {
-	err := SetupNewBuild(config)
-	if err != nil {
-		return fmt.Errorf("error setting up new build: %v", err)
-	}
-	err = RunPrecompileTasks(config)
-	if err != nil {
-		return fmt.Errorf("error running precompile tasks: %v", err)
-	}
-	if recompileBinary {
-		err = CompileBinary(config)
-		if err != nil {
-			return fmt.Errorf("error compiling binary: %v", err)
-		}
-	}
-	return nil
+func handlePublicFiles(config *common.Config, shouldBeGranular bool) error {
+	return processStaticFiles(config, &staticFileProcessorOpts{
+		DirName:          "public",
+		MapName:          common.PublicFileMapGobName,
+		ShouldBeGranular: shouldBeGranular,
+		GetIsNoHashDir: func(path string) bool {
+			return strings.HasPrefix(path, "__nohash/")
+		},
+		WriteWithHash: true,
+	})
+}
+
+func copyPrivateFiles(config *common.Config, shouldBeGranular bool) error {
+	return processStaticFiles(config, &staticFileProcessorOpts{
+		DirName:          "private",
+		MapName:          common.PrivateFileMapGobName,
+		ShouldBeGranular: shouldBeGranular,
+		GetIsNoHashDir: func(path string) bool {
+			return false
+		},
+		WriteWithHash: false,
+	})
 }

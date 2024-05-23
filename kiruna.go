@@ -19,10 +19,10 @@ type Kiruna struct {
 }
 
 func (k Kiruna) Build() error {
-	return buildtime.Build(k.Config, true)
+	return buildtime.Build(k.Config, true, false)
 }
 func (k Kiruna) BuildWithoutCompilingGo() error {
-	return buildtime.Build(k.Config, false)
+	return buildtime.Build(k.Config, false, false)
 }
 func (k Kiruna) GetPublicFS() (*runtime.UniversalFS, error) {
 	return runtime.GetPublicFS(k.Config)
