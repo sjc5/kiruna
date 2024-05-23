@@ -200,7 +200,7 @@ func main() {
 
 This file is what you'll want to run when you're ready to build for production. Running `go run ./cmd/build` will build your project and save your binary to `dist/bin/main`. Assuming you used `DistFS` to embed your static assets, you can now run your binary from anywhere on the build machine, and it will serve your static assets from the embedded filesystem. If you chose not to embed your static assets, you'll just need to make sure that the binary is a sibling of the `dist/kiruna` directory in order to serve your static assets from disk.
 
-Note: Oftentimes, you'll want to handle compilation of your Go binary yourself. In such cases, you can run `platform.Kiruna.BuildWithoutCompilingGo()` instead of `platform.Kiruna.Build()`. This will run all the same Kiruna-specific processing (static asset hashing, etc.) but will stop short of producing an executable.
+Note: Oftentimes, you'll want to handle compilation of your Go binary yourself. In such cases, you can use `platform.Kiruna.BuildWithoutCompilingGo()` instead of `platform.Kiruna.Build()`. This will run all the same Kiruna-specific processing (static asset hashing, etc.) but will stop short of producing an executable.
 
 ---
 
