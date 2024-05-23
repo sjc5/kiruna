@@ -280,10 +280,6 @@ When you want to watch different file types, you can add them to the `kiruna.Wat
 
 For simplicity and reduced support load, especially while Kiruna is in active early development, Kiruna is currently open source / closed contribution. This may change in the future, but no promises.
 
-## Copyright and License
-
-Copyright 2024 Samuel J. Cook. Licensed under the BSD 3-Clause License.
-
 ## Alternatives
 
 If you're just looking for automatic Go application rebuilds only, without automatic browser refreshes or static asset build tooling, then Kiruna may be overkill for you, and you could just use <a href="https://github.com/cosmtrek/air" target="_blank">Air</a> instead.
@@ -291,3 +287,7 @@ If you're just looking for automatic Go application rebuilds only, without autom
 That said, you can put Kiruna into a simpler `ServerOnly` mode if you want. This will disable all of the CSS and static asset build tooling, and it will only do automatic Go application rebuilds _a la_ Air.
 
 In either case, one benefit of Kiruna over Air is that it doesn't require you to install any tooling on your machine. It is orchestrated solely from inside your repo and its dependencies. So when a new developer joins your team, they can just clone your repo and be ready to rock as soon as they run `go mod tidy` (instead of needing to install and configure Air first).
+
+## Copyright and License
+
+Copyright 2024 Samuel J. Cook. Licensed under the BSD 3-Clause License.
