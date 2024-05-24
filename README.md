@@ -85,7 +85,7 @@ var Kiruna = kiruna.New(&kiruna.Config{
 
 ---
 
-### go get Kiruna
+### Add Kiruna as a dependency
 
 Now go get Kiruna and tidy up:
 
