@@ -18,7 +18,7 @@ Kiruna is a live refresh dev server and production-optimizing build tool. You ca
 - Basic CSS bundling and minification
 - Critical CSS inlining
 
-Kiruna's static asset hashing strategy allows you to serve public static assets with immutable caching headers.
+Kiruna's static asset hashing strategy allows you to serve public static assets with immutable cache headers.
 
 Dev-time reloads are smart and fast. Based on the type of file you edit and your associated configuration options, Kiruna will do the minimum amount of work necessary to get your changes to your browser as quickly as possible.
 
