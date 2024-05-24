@@ -1,6 +1,6 @@
 # 🏔️ Kiruna
 
-**Kiruna is a powerful development server and production build tool for full-stack Go applications. You can think of it as a Vite alternative for the Go ecosystem.**
+Kiruna is a powerful development server and production build tool for full-stack Go applications. You can think of it as a Vite alternative for the Go ecosystem.
 
 ### Dev server features
 
@@ -19,7 +19,7 @@
 
 Dev-time reloads are smart and fast. Based on the type of file you edit and your associated configuration options, Kiruna will do the minimum amount of work necessary to get your changes to your browser as quickly as possible.
 
-Kiruna has a few lightweight runtime helpers for referencing hashed static assets from Go code and templates (e.g., `Kiruna.GetPublicURL("favicon.ico")`) and for including your CSS in your HTML templates (e.g., `Kiruna.GetCriticalCSSStyleElement()`, `Kiruna.GetStyleSheetLinkElement()`). They have zero third-party dependencies are aggressively cached whenever possible, so you can feel free to call them even in the hot path of your application.
+Kiruna has a few lightweight runtime helpers for referencing hashed static assets from Go code and templates (e.g., `Kiruna.GetPublicURL("favicon.ico")`) and for including your CSS in your HTML templates (e.g., `Kiruna.GetCriticalCSSStyleElement()`, `Kiruna.GetStyleSheetLinkElement()`). They have zero third-party dependencies and are aggressively cached whenever possible, so you can feel free to call them even in the hot path of your application.
 
 Kiruna is completely decoupled from any specific frameworks or libraries, so you can use it with any Go server framework or router you choose, or just use the standard library.
 
