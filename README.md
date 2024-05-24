@@ -2,7 +2,7 @@
 
 ## What is Kiruna?
 
-Kiruna is a live refresh dev server and production-optimizing build tool. You can think of it as a Vite alternative for full-stack Go applications.
+Kiruna is a powerful development server and production build tool for full-stack Go applications. You can think of it as a Vite alternative for the Go ecosystem.
 
 ### Dev server features
 
