@@ -17,12 +17,11 @@ Kiruna is a live refresh dev server and production-optimizing build tool. You ca
 - Static asset hashing and embedding
 - Basic CSS bundling and minification
 - Critical CSS inlining
-
-Kiruna's static asset hashing strategy allows you to serve public static assets with immutable cache headers.
+- Safely serve public static assets with immutable cache headers
 
 Dev-time reloads are smart and fast. Based on the type of file you edit and your associated configuration options, Kiruna will do the minimum amount of work necessary to get your changes to your browser as quickly as possible.
 
-Kiruna has a few lightweight runtime helpers for referencing hashed static assets from Go code and templates (e.g., `Kiruna.GetPublicURL("favicon.ico")`) and for including your CSS in your HTML templates (e.g., `Kiruna.GetCriticalCSSStyleElement()`, `Kiruna.GetStyleSheetLinkElement()`). They have zero third-party dependencies are aggressively cached whenever possible, so you can feel free to call them even in the hot path of your application without much worry.
+Kiruna has a few lightweight runtime helpers for referencing hashed static assets from Go code and templates (e.g., `Kiruna.GetPublicURL("favicon.ico")`) and for including your CSS in your HTML templates (e.g., `Kiruna.GetCriticalCSSStyleElement()`, `Kiruna.GetStyleSheetLinkElement()`). They have zero third-party dependencies are aggressively cached whenever possible, so you can feel free to call them even in the hot path of your application.
 
 Kiruna is completely decoupled from any specific frameworks or libraries, so you can use it with any Go server framework or router you choose, or just use the standard library.
 
