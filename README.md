@@ -6,13 +6,16 @@ Kiruna is a live refresh dev server and production-optimizing build tool. You ca
 
 ### Dev server features
 
-- Automatic rebuilds and browser refreshes
+- Automatic smart rebuilds and browser refreshes
 - Instant hot reloading for CSS files (without a full page refresh)
+- Highly configurable to support any use case
+- Glob pattern file watching
+- Granular build hooks with customizable timing strategies
 
 ### Production optimizations
 
 - Static asset hashing and embedding
-- CSS bundling and minification
+- Basic CSS bundling and minification
 - Critical CSS inlining
 
 Kiruna's static asset hashing strategy allows you to serve public static assets with immutable caching headers.
