@@ -1,6 +1,9 @@
 # 🏔️ Kiruna
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/sjc5/kiruna.svg)](https://pkg.go.dev/github.com/sjc5/kiruna)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sjc5/kiruna)](https://goreportcard.com/report/github.com/sjc5/kiruna)
+
+<img src="/banner.webp" alt="Kiruna logo banner">
 
 Kiruna is a powerful development server and production build tool for full-stack Go applications. You can think of it as a Vite alternative for the Go ecosystem.
 
