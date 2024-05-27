@@ -43,24 +43,28 @@ go mod init your-module-name
 Then run the following commands to create the necessary directories and files for your project:
 
 ```sh
-mkdir -p cmd/app && touch cmd/app/main.go && echo 'package main' > cmd/app/main.go
-mkdir -p cmd/build && touch cmd/build/main.go && echo 'package main' > cmd/build/main.go
-mkdir -p cmd/dev && touch cmd/dev/main.go && echo 'package main' > cmd/dev/main.go
-mkdir -p styles/critical && touch styles/critical/main.css
-mkdir -p styles/normal && touch styles/normal/main.css
-mkdir -p dist/kiruna && touch dist/kiruna/x && touch dist/dist.go && echo "package dist" > dist/dist.go
-mkdir -p static/private && touch static/private/index.go.html
-mkdir -p static/public/__nohash
-mkdir -p internal/platform && touch internal/platform/kiruna.go && echo "package platform" > internal/platform/kiruna.go
+# Scaffold directories
+mkdir -p cmd/app cmd/build cmd/dev
+mkdir -p static/private static/public/__nohash
+mkdir -p styles/critical styles/normal
+mkdir -p dist/kiruna internal/platform
+
+# Create placeholder files
+touch cmd/app/main.go cmd/build/main.go cmd/dev/main.go
+touch static/private/index.go.html
+touch styles/critical/main.css styles/normal/main.css
+touch dist/kiruna/x dist/dist.go internal/platform/kiruna.go
 ```
 
 ---
 
 ### Setup `dist/dist.go`
 
-Now copy this into your `dist/dist.go` file, under the package declaration:
+Now copy this into your `dist/dist.go` file:
 
 ```go
+package dist
+
 import (
 	"embed"
 )
@@ -73,9 +77,11 @@ var FS embed.FS
 
 ### Setup `internal/platform/kiruna.go`
 
-Now copy this into your `internal/platform/kiruna.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+Now copy this into your `internal/platform/kiruna.go` file, replacing `your-module-name` with your own module name:
 
 ```go
+package platform
+
 import (
 	"your-module-name/dist"
 
@@ -127,14 +133,16 @@ Now copy this into your `static/private/index.go.html` file:
 
 ### Setup `cmd/app/main.go`
 
-And now copy this into your `cmd/app/main.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+And now copy this into your `cmd/app/main.go` file, replacing `your-module-name` with your own module name:
 
 ```go
+package main
+
 import (
 	"fmt"
 	"html/template"
-	"your-module-name/internal/platform"
 	"net/http"
+	"your-module-name/internal/platform"
 
 	"github.com/sjc5/kiruna"
 )
@@ -165,12 +173,8 @@ func main() {
 			return
 		}
 
-		err = tmpl.Execute(w, struct {
-			Kiruna     *kiruna.Kiruna
-			FaviconURL string
-		}{
-			Kiruna:     platform.Kiruna,
-			FaviconURL: platform.Kiruna.GetPublicURL("favicon.ico"),
+		err = tmpl.Execute(w, struct{ Kiruna *kiruna.Kiruna }{
+			Kiruna: platform.Kiruna,
 		})
 		if err != nil {
 			http.Error(w, "Error executing template", http.StatusInternalServerError)
@@ -188,9 +192,11 @@ func main() {
 
 ### Setup `cmd/build/main.go`
 
-And copy this into your `cmd/build/main.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+And copy this into your `cmd/build/main.go` file, replacing `your-module-name` with your own module name:
 
 ```go
+package main
+
 import (
 	"your-module-name/internal/platform"
 )
@@ -211,9 +217,11 @@ This file is what you'll want to run when you're ready to build for production. 
 
 ### Setup `cmd/dev/main.go`
 
-Now copy this into your `cmd/dev/main.go` file, under the package declaration, replacing `your-module-name` with your own module name:
+Now copy this into your `cmd/dev/main.go` file, replacing `your-module-name` with your own module name:
 
 ```go
+package main
+
 import (
 	"your-module-name/internal/platform"
 
@@ -277,7 +285,7 @@ Now let's try editing your html template at `static/private/index.go.html`.
 
 Find the line that says `<h1>Hello, world!</h1>` (line 10) and change it to: `<h1 style="color: green;">Hello, world!</h1>`.
 
-When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you were to remove that item, the page would not reload when you save your html file (if you don't believe me, go give it a try).
+When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you were to remove that item and restart your dev server, the page would not reload when you save your html file (if you don't believe me, go give it a try).
 
 When you want to watch different file types, you can add them to the `kiruna.WatchedFiles` slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more. Feel free to explore your auto-complete options here or dive into the Kiruna source code to learn more.
 
