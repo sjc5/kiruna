@@ -65,9 +65,7 @@ Now copy this into your `dist/dist.go` file:
 ```go
 package dist
 
-import (
-	"embed"
-)
+import "embed"
 
 //go:embed kiruna
 var FS embed.FS
