@@ -26,7 +26,7 @@ Dev-time reloads are smart and fast. Based on the type of file you edit and your
 
 Kiruna has a few lightweight runtime helpers for referencing hashed static assets from Go code and templates (e.g., `Kiruna.GetPublicURL("favicon.ico")`) and for including your CSS in your HTML templates (e.g., `Kiruna.GetCriticalCSSStyleElement()`, `Kiruna.GetStyleSheetLinkElement()`). They have zero third-party dependencies and are aggressively cached whenever possible, so you can feel free to call them even in the hot path of your application.
 
-Kiruna is completely decoupled from any specific frameworks or libraries, so you can use it with any Go server framework or router you choose, or just use the standard library.
+Kiruna is completely decoupled from any specific frameworks or libraries, so you can use it with any Go server framework or router you choose, or just use the standard library. Moreover, unlike some alternatives, Kiruna doesn't require you to install any tooling on your machine. It is orchestrated solely from inside your repo and its dependencies.
 
 ## Starter Tutorial From Scratch (~5 minutes)
 
@@ -118,7 +118,7 @@ Now copy this into your `static/private/index.go.html` file:
 		{{.Kiruna.GetCriticalCSSStyleElement}} {{.Kiruna.GetStyleSheetLinkElement}}
 	</head>
 	<body>
-		<div id="root">
+		<div>
 			<h1>Hello, world!</h1>
 			<p>Hello from "static/private/index.go.html"</p>
 		</div>
@@ -209,7 +209,8 @@ func main() {
 
 This file is what you'll want to run when you're ready to build for production. Running `go run ./cmd/build` will build your project and save your binary to `dist/bin/main`. Assuming you used `DistFS` to embed your static assets, you can now run your binary from anywhere on the build machine, and it will serve your static assets from the embedded filesystem. If you chose not to embed your static assets, you'll just need to make sure that the binary is a sibling of the `dist/kiruna` directory in order to serve your static assets from disk.
 
-**NOTE:** Oftentimes you'll want to handle compilation of your Go binary yourself. In such cases, you can use `platform.Kiruna.BuildWithoutCompilingGo()` instead of `platform.Kiruna.Build()`. This will run all the same Kiruna-specific processing (static asset hashing, etc.) but will stop short of producing an executable.
+[!NOTE]
+Oftentimes you'll want to handle compilation of your Go binary yourself. In such cases, you can use `platform.Kiruna.BuildWithoutCompilingGo()` instead of `platform.Kiruna.Build()`. This will run all the same Kiruna-specific processing (static asset hashing, etc.) but will stop short of producing an executable.
 
 ---
 
@@ -273,7 +274,10 @@ h1 {
 }
 ```
 
-When you hit save, this should also hot reload. Note that you can put multiple css stylesheets into both the `styles/critical` and `styles/normal` directories. In each case, the CSS will be minified and concatenated in alphabetical order by filename.
+When you hit save, this should also hot reload.
+
+[!NOTE]
+You can put multiple css stylesheets into the `styles/critical` and `styles/normal` directories. In each case, the CSS will be minified and concatenated in alphabetical order by filename.
 
 ---
 
