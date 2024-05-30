@@ -195,9 +195,7 @@ And copy this into your `cmd/build/main.go` file, replacing `your-module-name` w
 ```go
 package main
 
-import (
-	"your-module-name/internal/platform"
-)
+import "your-module-name/internal/platform"
 
 func main() {
 	err := platform.Kiruna.Build()
@@ -291,9 +289,11 @@ When you hit save, your browser page should automatically refresh itself. This h
 
 When you want to watch different file types, you can add them to the `kiruna.WatchedFiles` slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more. Feel free to explore your auto-complete options here or dive into the Kiruna source code to learn more.
 
+---
+
 ### Setup .gitignore
 
-If desired, create a `.gitignore` by running the following:
+If desired, you can bootstrap a new `.gitignore` file by running the following:
 
 ```sh
 echo "dist/*\n\!dist/dist.go" > .gitignore
