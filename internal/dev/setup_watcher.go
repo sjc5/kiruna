@@ -96,16 +96,18 @@ func mustHandleWatcherEmissions(config *common.Config, manager *ClientManager, w
 }
 
 type sortedOnChangeCallbacks struct {
-	stratPre        []common.OnChange
-	stratConcurrent []common.OnChange
-	stratPost       []common.OnChange
-	exists          bool
+	stratPre              []common.OnChange
+	stratConcurrent       []common.OnChange
+	stratPost             []common.OnChange
+	stratConcurrentNoWait []common.OnChange
+	exists                bool
 }
 
 func sortOnChangeCallbacks(onChanges []common.OnChange) sortedOnChangeCallbacks {
 	stratPre := []common.OnChange{}
 	stratConcurrent := []common.OnChange{}
 	stratPost := []common.OnChange{}
+	stratConcurrentNoWait := []common.OnChange{}
 	exists := false
 	if len(onChanges) == 0 {
 		return sortedOnChangeCallbacks{}
@@ -113,21 +115,23 @@ func sortOnChangeCallbacks(onChanges []common.OnChange) sortedOnChangeCallbacks 
 		exists = true
 	}
 	for _, o := range onChanges {
-		if o.Strategy == common.OnChangeStrategyPre || o.Strategy == "" {
+		switch o.Strategy {
+		case common.OnChangeStrategyPre, "":
 			stratPre = append(stratPre, o)
-		}
-		if o.Strategy == common.OnChangeStrategyConcurrent {
+		case common.OnChangeStrategyConcurrent:
 			stratConcurrent = append(stratConcurrent, o)
-		}
-		if o.Strategy == common.OnChangeStrategyPost {
+		case common.OnChangeStrategyPost:
 			stratPost = append(stratPost, o)
+		case common.OnChangeStrategyConcurrentNoWait:
+			stratConcurrentNoWait = append(stratConcurrentNoWait, o)
 		}
 	}
 	return sortedOnChangeCallbacks{
-		stratPre:        stratPre,
-		stratConcurrent: stratConcurrent,
-		stratPost:       stratPost,
-		exists:          exists,
+		stratPre:              stratPre,
+		stratConcurrent:       stratConcurrent,
+		stratPost:             stratPost,
+		stratConcurrentNoWait: stratConcurrentNoWait,
+		exists:                exists,
 	}
 }
 
@@ -140,11 +144,11 @@ func getIsIgnored(path string, ignoredPatterns *[]string) bool {
 	return false
 }
 
-func runConcurrentOnChangeCallbacks(sortedOnChanges *sortedOnChangeCallbacks, evtName string) {
-	if len(sortedOnChanges.stratConcurrent) > 0 {
+func runConcurrentOnChangeCallbacks(onChanges *[]common.OnChange, evtName string, shouldWait bool) {
+	if len(*onChanges) > 0 {
 		wg := sync.WaitGroup{}
-		wg.Add(len(sortedOnChanges.stratConcurrent))
-		for _, o := range sortedOnChanges.stratConcurrent {
+		wg.Add(len(*onChanges))
+		for _, o := range *onChanges {
 			if getIsIgnored(evtName, &o.ExcludedPatterns) {
 				wg.Done()
 				continue
@@ -157,12 +161,14 @@ func runConcurrentOnChangeCallbacks(sortedOnChanges *sortedOnChangeCallbacks, ev
 				}
 			}(o)
 		}
-		wg.Wait()
+		if shouldWait {
+			wg.Wait()
+		}
 	}
 }
 
-func simpleRunOnChangeCallbacks(onChanges []common.OnChange, evtName string) {
-	for _, o := range onChanges {
+func simpleRunOnChangeCallbacks(onChanges *[]common.OnChange, evtName string) {
+	for _, o := range *onChanges {
 		if getIsIgnored(evtName, &o.ExcludedPatterns) {
 			continue
 		}
@@ -376,7 +382,11 @@ func mustHandleFileChange(
 	var buildErr error
 
 	if sortedOnChanges.exists {
-		simpleRunOnChangeCallbacks(sortedOnChanges.stratPre, evt.Name)
+		go func() {
+			runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrentNoWait, evt.Name, false)
+		}()
+
+		simpleRunOnChangeCallbacks(&sortedOnChanges.stratPre, evt.Name)
 
 		if wfc.RunOnChangeOnly {
 			util.Log.Infof("ran applicable onChange callbacks")
@@ -390,7 +400,7 @@ func mustHandleFileChange(
 			buildErr = callback(config, wfc, evtDetails)
 		}()
 
-		runConcurrentOnChangeCallbacks(&sortedOnChanges, evt.Name)
+		runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrent, evt.Name, true)
 		wg.Wait()
 	} else {
 		buildErr = callback(config, wfc, evtDetails)
@@ -401,7 +411,7 @@ func mustHandleFileChange(
 		return buildErr
 	}
 
-	simpleRunOnChangeCallbacks(sortedOnChanges.stratPost, evt.Name)
+	simpleRunOnChangeCallbacks(&sortedOnChanges.stratPost, evt.Name)
 
 	needsHardReloadEvenIfNonGo := wfc.RecompileBinary || wfc.RestartApp
 

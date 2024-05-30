@@ -281,7 +281,7 @@ When you hit save, this should also hot reload.
 
 ---
 
-### Edit your html template
+### Edit your HTML template
 
 Now let's try editing your html template at `static/private/index.go.html`.
 
@@ -290,6 +290,14 @@ Find the line that says `<h1>Hello, world!</h1>` (line 10) and change it to: `<h
 When you hit save, your browser page should automatically refresh itself. This happens because of the `{Pattern: "**/*.go.html"}` item in the `kiruna.WatchedFiles` slice in `cmd/dev/main.go`. If you were to remove that item and restart your dev server, the page would not reload when you save your html file (if you don't believe me, go give it a try).
 
 When you want to watch different file types, you can add them to the `kiruna.WatchedFiles` slice using glob patterns, and there are a whole bunch of ways to tweak this to get your desired reload behavior and sequencing, including callbacks and more. Feel free to explore your auto-complete options here or dive into the Kiruna source code to learn more.
+
+### Setup .gitignore
+
+If desired, create a `.gitignore` by running the following:
+
+```sh
+echo "dist/*\n\!dist/dist.go" > .gitignore
+```
 
 ## Open source / closed contribution
 

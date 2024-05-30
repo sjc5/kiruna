@@ -80,6 +80,7 @@ type IgnorePatterns = common.IgnorePatterns
 const OnChangeStrategyConcurrent = common.OnChangeStrategyConcurrent
 const OnChangeStrategyPost = common.OnChangeStrategyPost
 const OnChangeStrategyPre = common.OnChangeStrategyPre
+const OnChangeStrategyConcurrentNoWait = common.OnChangeStrategyConcurrentNoWait
 
 var SetupDistDir = buildtime.SetupDistDir
 var MustGetPort = util.MustGetPort

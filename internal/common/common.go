@@ -67,6 +67,7 @@ type DevConfig struct {
 const OnChangeStrategyPre = "pre"
 const OnChangeStrategyPost = "post"
 const OnChangeStrategyConcurrent = "concurrent"
+const OnChangeStrategyConcurrentNoWait = "concurrent-no-wait"
 
 type OnChangeFunc func(string) error
 
