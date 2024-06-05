@@ -29,8 +29,12 @@ func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 	for _, p := range naiveIgnoreDirPatterns {
 		ignoredDirPatterns = append(ignoredDirPatterns, filepath.Join(cleanRootDir, p))
 	}
-	ignoredDirPatterns = append(ignoredDirPatterns, config.DevConfig.IgnorePatterns.Dirs...)
-	ignoredFilePatterns = append(ignoredFilePatterns, config.DevConfig.IgnorePatterns.Files...)
+	for _, p := range config.DevConfig.IgnorePatterns.Dirs {
+		ignoredDirPatterns = append(ignoredDirPatterns, filepath.Join(cleanRootDir, p))
+	}
+	for _, p := range config.DevConfig.IgnorePatterns.Files {
+		ignoredFilePatterns = append(ignoredFilePatterns, filepath.Join(cleanRootDir, p))
+	}
 
 	defaultWatchedFiles = append(defaultWatchedFiles, common.WatchedFile{
 		Pattern: filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
