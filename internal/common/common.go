@@ -74,11 +74,11 @@ type OnChangeFunc func(string) error
 type OnChange struct {
 	Strategy         string
 	Func             OnChangeFunc
-	ExcludedPatterns []string // Glob patterns
+	ExcludedPatterns []string // Glob patterns (set relative to Config.RootDir)
 }
 
 type WatchedFile struct {
-	Pattern string // Glob pattern
+	Pattern string // Glob pattern (set relative to Config.RootDir)
 
 	// By default, OnChange runs before any Kiruna processing. As long as "SkipRebuildingNotification"
 	// is false (default), Kiruna will send a signal to the browser to show the

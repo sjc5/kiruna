@@ -36,6 +36,20 @@ func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 		ignoredFilePatterns = append(ignoredFilePatterns, filepath.Join(cleanRootDir, p))
 	}
 
+	// Loop through all WatchedFiles...
+	for i, wfc := range config.DevConfig.WatchedFiles {
+		// and make each WatchedFile's Pattern relative to cleanRootDir...
+		config.DevConfig.WatchedFiles[i].Pattern = filepath.Join(cleanRootDir, wfc.Pattern)
+
+		// then loop through such WatchedFile's OnChangeCallbacks...
+		for j, oc := range wfc.OnChangeCallbacks {
+			// and make each such OnChangeCallback's ExcludedPatterns also relative to cleanRootDir
+			for k, p := range oc.ExcludedPatterns {
+				config.DevConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(cleanRootDir, p)
+			}
+		}
+	}
+
 	defaultWatchedFiles = append(defaultWatchedFiles, common.WatchedFile{
 		Pattern: filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
 	})
