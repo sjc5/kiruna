@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -51,7 +52,8 @@ func mustSetupWatcher(manager *ClientManager, config *common.Config) {
 	}
 
 	defaultWatchedFiles = append(defaultWatchedFiles, common.WatchedFile{
-		Pattern: filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
+		Pattern:    filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
+		RestartApp: true,
 	})
 
 	watcher, err := fsnotify.NewWatcher()
@@ -468,7 +470,7 @@ func mustHandleFileChange(
 			ChangeType: cssType,
 
 			// These must be called AFTER ProcessCSS
-			CriticalCSS:  runtime.GetCriticalCSS(config),
+			CriticalCSS:  base64.StdEncoding.EncodeToString([]byte(runtime.GetCriticalCSS(config))),
 			NormalCSSURL: runtime.GetStyleSheetURL(config),
 		},
 	)

@@ -10,6 +10,11 @@ func GetRefreshScriptInner(port int) string {
 	// changeTypes: "rebuilding", "other", "normal", "critical"
 	// Element IDs: "__refreshscript-rebuilding", "__normal-css", "__critical-css"
 	return fmt.Sprintf(`
+function base64ToUTF8(base64) {
+  const bytes = Uint8Array.from(atob(base64), (m) => m.codePointAt(0) || 0);
+  return new TextDecoder().decode(bytes);
+}
+
 const scrollYKey = "__kiruna_internal__devScrollY";
 const scrollY = localStorage.getItem(scrollYKey);
 if (scrollY) {
@@ -69,7 +74,7 @@ es.onmessage = (e) => {
 		const oldStyle = document.getElementById("__critical-css");
 		const newStyle = document.createElement("style");
 		newStyle.id = "__critical-css";
-		newStyle.innerHTML = criticalCss;
+		newStyle.innerHTML = base64ToUTF8(criticalCss);
 		document.head.replaceChild(newStyle, oldStyle);
 	}
 };

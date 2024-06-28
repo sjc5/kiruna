@@ -33,6 +33,17 @@ func (k Kiruna) GetPrivateFS() (*runtime.UniversalFS, error) {
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 	return runtime.GetPublicURL(k.Config, originalPublicURL, false)
 }
+
+/*
+ * MakePublicURLsMap creates a map of public URLs for the given filepaths, where
+ * the keys are sanitized versions of the filepaths, replacing non-alphanumeric
+ * characters with underscores. For example, the filepath "javascript/main.js"
+ * would be sanitized to "javascript_main_js". One use case for this is to
+ * pass a map of public URLs to a Go template.
+ */
+func (k Kiruna) MakePublicURLsMap(filepaths []string) map[string]string {
+	return runtime.MakePublicURLsMap(k.Config, filepaths, false)
+}
 func (k Kiruna) MustStartDev(devConfig *common.DevConfig) {
 	k.Config.DevConfig = devConfig
 	dev.MustStartDev(k.Config)
@@ -76,6 +87,7 @@ type WatchedFiles = common.WatchedFiles
 type OnChangeFunc = common.OnChangeFunc
 type OnChange = common.OnChange
 type IgnorePatterns = common.IgnorePatterns
+type UniversalFS = runtime.UniversalFS
 
 const OnChangeStrategyConcurrent = common.OnChangeStrategyConcurrent
 const OnChangeStrategyPost = common.OnChangeStrategyPost

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
@@ -49,4 +50,25 @@ func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool
 
 func cleanURL(url string) string {
 	return strings.TrimPrefix(filepath.Clean(url), "/")
+}
+
+func MakePublicURLsMap(config *common.Config, filepaths []string, useDirFS bool) map[string]string {
+	filepathsMap := make(map[string]string, len(filepaths))
+	var sb strings.Builder
+	sb.Grow(64)
+
+	for _, filepath := range filepaths {
+		sb.Reset()
+		for _, r := range filepath {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				sb.WriteRune(r)
+			} else {
+				sb.WriteRune('_')
+			}
+		}
+		safeKey := sb.String()
+		filepathsMap[safeKey] = GetPublicURL(config, filepath, useDirFS)
+	}
+
+	return filepathsMap
 }

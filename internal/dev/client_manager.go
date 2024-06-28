@@ -15,9 +15,11 @@ const (
 	ChangeTypeRebuilding  ChangeType = "rebuilding"
 )
 
+type Base64 = string
+
 type RefreshFilePayload struct {
 	ChangeType   ChangeType `json:"changeType"`
-	CriticalCSS  string     `json:"criticalCss"`
+	CriticalCSS  Base64     `json:"criticalCss"`
 	NormalCSSURL string     `json:"normalCssUrl"`
 	At           time.Time  `json:"at"`
 }
