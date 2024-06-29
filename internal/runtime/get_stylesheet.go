@@ -7,14 +7,15 @@ import (
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
+	"github.com/sjc5/kit/pkg/typed"
 )
 
 const StyleSheetElementID = "__normal-css"
 
-var styleSheetURLCacheMap = make(map[*common.Config]string)
+var styleSheetURLCacheMap = typed.SyncMap[*common.Config, string]{}
 
 func GetStyleSheetURL(config *common.Config) string {
-	if hit, isCached := styleSheetURLCacheMap[config]; isCached && !common.KirunaEnv.GetIsDev() {
+	if hit, isCached := styleSheetURLCacheMap.Load(config); isCached && !common.KirunaEnv.GetIsDev() {
 		return hit
 	}
 
@@ -32,26 +33,26 @@ func GetStyleSheetURL(config *common.Config) string {
 	}
 
 	url := "/public/" + string(content)
-	styleSheetURLCacheMap[config] = url // Cache the URL
+	styleSheetURLCacheMap.Store(config, url) // Cache the URL
 	return url
 }
 
-var styleSheetElementCacheMap = make(map[*common.Config]template.HTML)
+var styleSheetElementCacheMap = typed.SyncMap[*common.Config, template.HTML]{}
 
 func GetStyleSheetLinkElement(config *common.Config) template.HTML {
-	if hit, isCached := styleSheetElementCacheMap[config]; isCached && !common.KirunaEnv.GetIsDev() {
+	if hit, isCached := styleSheetElementCacheMap.Load(config); isCached && !common.KirunaEnv.GetIsDev() {
 		return hit
 	}
 
 	url := GetStyleSheetURL(config)
 	if url == "" {
-		styleSheetElementCacheMap[config] = "" // Cache the empty string
+		styleSheetElementCacheMap.Store(config, "") // Cache the empty string
 		return ""
 	}
 
 	el := template.HTML(fmt.Sprintf(
 		"<link rel=\"stylesheet\" href=\"%s\" id=\"%s\" />", url, StyleSheetElementID,
 	))
-	styleSheetElementCacheMap[config] = el // Cache the element
+	styleSheetElementCacheMap.Store(config, el) // Cache the element
 	return el
 }

@@ -4,37 +4,46 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
+	"github.com/sjc5/kit/pkg/typed"
 )
 
-var fileMapFromGlobCacheMap = make(map[string]*map[string]string)
-var urlCacheMap = make(map[string]string)
+var (
+	fileMapFromGlobCacheMap = typed.SyncMap[string, map[string]string]{}
+	fileMapLoadOnce         = typed.SyncMap[string, *sync.Once]{}
+	urlCacheMap             = typed.SyncMap[string, string]{}
+)
 
 func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool) string {
 	fileMapKey := fmt.Sprintf("%p", config) + fmt.Sprintf("%t", useDirFS)
 	urlKey := fileMapKey + originalPublicURL
 
-	if hit, isCached := urlCacheMap[urlKey]; isCached {
+	if hit, isCached := urlCacheMap.Load(urlKey); isCached {
 		return hit
 	}
 
-	if fileMapFromGlobCacheMap[fileMapKey] == nil {
+	once, _ := fileMapLoadOnce.LoadOrStore(fileMapKey, &sync.Once{})
+	once.Do(func() {
 		fileMapFromGob, err := LoadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
 		if err != nil {
 			util.Log.Errorf("error loading file map from gob: %v", err)
-			return originalPublicURL
+			return
 		}
-		fileMapFromGlobCacheMap[fileMapKey] = &fileMapFromGob
-	}
+		fileMapFromGlobCacheMap.Store(fileMapKey, fileMapFromGob)
+	})
 
-	fileMap := *fileMapFromGlobCacheMap[fileMapKey]
+	fileMap, _ := fileMapFromGlobCacheMap.Load(fileMapKey)
+	if fileMap == nil {
+		return originalPublicURL
+	}
 
 	if hashedURL, existsInFileMap := fileMap[cleanURL(originalPublicURL)]; existsInFileMap {
 		finalURL := "/public/" + hashedURL
-		urlCacheMap[urlKey] = finalURL // Cache the hashed URL
+		urlCacheMap.Store(urlKey, finalURL) // Cache the hashed URL
 		return finalURL
 	}
 
@@ -44,7 +53,7 @@ func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool
 		originalPublicURL,
 	)
 	finalURL := "/public/" + originalPublicURL
-	urlCacheMap[urlKey] = finalURL // Cache the original URL
+	urlCacheMap.Store(urlKey, finalURL) // Cache the original URL
 	return finalURL
 }
 

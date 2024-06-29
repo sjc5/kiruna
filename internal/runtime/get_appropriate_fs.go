@@ -9,27 +9,29 @@ import (
 
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/util"
+	"github.com/sjc5/kit/pkg/typed"
 )
 
 const fsTypeDev = "dev"
 
-var uniDirFSCacheMap = make(map[*common.Config]*UniversalFS)
+var uniDirFSCacheMap = typed.SyncMap[*common.Config, *UniversalFS]{}
 
 func GetUniversalDirFS(config *common.Config) *UniversalFS {
-	if hit, isCached := uniDirFSCacheMap[config]; isCached {
+	if hit, isCached := uniDirFSCacheMap.Load(config); isCached {
 		return hit
 	}
 	fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist/kiruna")))
-	uniDirFSCacheMap[config] = fs
-	return fs
+	actualFS, _ := uniDirFSCacheMap.LoadOrStore(config, fs)
+	return actualFS
 }
 
-var uniFSCacheMap = make(map[*common.Config]*UniversalFS)
-var fsTypeCacheMap = make(map[*common.Config]string)
+var uniFSCacheMap = typed.SyncMap[*common.Config, *UniversalFS]{}
+var fsTypeCacheMap = typed.SyncMap[*common.Config, string]{}
 
 func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
-	if hit, isCached := uniFSCacheMap[config]; isCached {
-		skipCache := common.KirunaEnv.GetIsDev() && fsTypeCacheMap[config] != fsTypeDev
+	if hit, isCached := uniFSCacheMap.Load(config); isCached {
+		cachedFSType, _ := fsTypeCacheMap.Load(config)
+		skipCache := common.KirunaEnv.GetIsDev() && cachedFSType != fsTypeDev
 		if !skipCache {
 			return hit, nil
 		}
@@ -40,12 +42,12 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// where your go.mod file is.
 	if common.KirunaEnv.GetIsDev() {
 		// ensures "needsReset" is always true in dev
-		fsTypeCacheMap[config] = fsTypeDev
+		fsTypeCacheMap.Store(config, fsTypeDev)
 
 		util.Log.Infof("using disk file system (development)")
 		fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist/kiruna")))
-		uniFSCacheMap[config] = fs // cache the fs
-		return fs, nil
+		actualFS, _ := uniFSCacheMap.LoadOrStore(config, fs) // cache the fs
+		return actualFS, nil
 	}
 
 	// PROD
@@ -62,8 +64,8 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 			return nil, err
 		}
 		fs := newUniversalFS(FS)
-		uniFSCacheMap[config] = fs // cache the fs
-		return fs, nil
+		actualFS, _ := uniFSCacheMap.LoadOrStore(config, fs) // cache the fs
+		return actualFS, nil
 	}
 
 	// PROD
@@ -75,8 +77,8 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 		return nil, err
 	}
 	fs := newUniversalFS(os.DirFS(execDir))
-	uniFSCacheMap[config] = fs // cache the fs
-	return fs, nil
+	actualFS, _ := uniFSCacheMap.LoadOrStore(config, fs) // cache the fs
+	return actualFS, nil
 }
 
 func getExecutableDir() (string, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 	"github.com/sjc5/kiruna/internal/runtime"
 	"github.com/sjc5/kiruna/internal/util"
+	"github.com/sjc5/kit/pkg/typed"
 )
 
 var naiveIgnoreDirPatterns = [4]string{"**/.git", "**/node_modules", "dist/bin", "dist/kiruna"}
@@ -257,12 +258,12 @@ type EvtDetails struct {
 	matchingWatchedFile *common.WatchedFile
 }
 
-var cachedMatchResults = map[string]bool{}
+var cachedMatchResults = typed.SyncMap[string, bool]{}
 
 func getIsMatch(pattern string, path string) bool {
 	combined := pattern + path
 
-	if hit, isCached := cachedMatchResults[combined]; isCached {
+	if hit, isCached := cachedMatchResults.Load(combined); isCached {
 		return hit
 	}
 
@@ -274,8 +275,8 @@ func getIsMatch(pattern string, path string) bool {
 		return false
 	}
 
-	cachedMatchResults[combined] = matches // cache the result
-	return matches
+	actualValue, _ := cachedMatchResults.LoadOrStore(combined, matches)
+	return actualValue
 }
 
 func getEvtDetails(config *common.Config, evt fsnotify.Event) EvtDetails {
