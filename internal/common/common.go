@@ -14,6 +14,11 @@ const (
 
 type Callback func() error
 
+type Logger interface {
+	Infof(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
 type Config struct {
 	/*
 		If not nil, the embedded file system will be used in production builds.
@@ -43,6 +48,8 @@ type Config struct {
 	EntryPoint string
 
 	DevConfig *DevConfig
+
+	Logger Logger
 }
 
 func (c *Config) GetIsUsingEmbeddedFS() bool {

@@ -14,10 +14,18 @@ import (
 	"unicode"
 
 	"github.com/sjc5/kiruna/internal/common"
-	"github.com/sjc5/kiruna/internal/util"
 	"github.com/sjc5/kit/pkg/executil"
 	"github.com/sjc5/kit/pkg/fsutil"
 	"github.com/sjc5/kit/pkg/typed"
+)
+
+const (
+	internalDir          = "internal"
+	publicDir            = "public"
+	staticDir            = "static"
+	distKirunaDir        = "dist/kiruna"
+	criticalCSSFile      = "critical.css"
+	normalCSSFileRefFile = "normal_css_file_ref.txt"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -34,11 +42,11 @@ type criticalCSSStatus struct {
 	styleElIsCached bool
 }
 
-var cacheMap = typed.SyncMap[*common.Config, *criticalCSSStatus]{}
+var criticalCSSCacheMap = typed.SyncMap[*common.Config, *criticalCSSStatus]{}
 
 func GetCriticalCSS(config *common.Config) string {
 	// If cache hit and PROD, return hit
-	if hit, isCached := cacheMap.Load(config); isCached && !common.KirunaEnv.GetIsDev() {
+	if hit, isCached := criticalCSSCacheMap.Load(config); isCached && !common.KirunaEnv.GetIsDev() {
 		hit.mu.RLock()
 		defer hit.mu.RUnlock()
 		if hit.noSuchFile {
@@ -48,29 +56,27 @@ func GetCriticalCSS(config *common.Config) string {
 	}
 
 	// Instantiate cache or get existing
-	cachedStatus, _ := cacheMap.LoadOrStore(config, &criticalCSSStatus{})
+	cachedStatus, _ := criticalCSSCacheMap.LoadOrStore(config, &criticalCSSStatus{})
 
 	// Get FS
 	fs, err := GetUniversalFS(config)
 	if err != nil {
-		util.Log.Errorf("error getting FS: %v", err)
+		config.Logger.Errorf("error getting FS: %v", err)
 		return ""
 	}
 
 	// Read critical CSS
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(filepath.Join("internal", "critical.css"))
+	content, err := fs.ReadFile(filepath.Join(internalDir, criticalCSSFile))
 	if err != nil {
-		// Check if the error is a non-existent file
-		noSuchFile := strings.HasSuffix(err.Error(), "no such file or directory")
-
 		cachedStatus.mu.Lock()
-		cachedStatus.noSuchFile = noSuchFile // Set noSuchFile flag in cache
-		cachedStatus.mu.Unlock()
+		defer cachedStatus.mu.Unlock()
+		// Check if the error is a non-existent file, and set the noSuchFile flag in the cache
+		cachedStatus.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
 
 		// if the error was something other than a non-existent file, log it
-		if !noSuchFile {
-			util.Log.Errorf("error reading critical CSS: %v", err)
+		if !cachedStatus.noSuchFile {
+			config.Logger.Errorf("error reading critical CSS: %v", err)
 		}
 		return ""
 	}
@@ -78,15 +84,15 @@ func GetCriticalCSS(config *common.Config) string {
 	criticalCSS := string(content)
 
 	cachedStatus.mu.Lock()
+	defer cachedStatus.mu.Unlock()
 	cachedStatus.codeStr = criticalCSS // Cache the critical CSS
-	cachedStatus.mu.Unlock()
 
 	return criticalCSS
 }
 
 func GetCriticalCSSStyleElement(config *common.Config) template.HTML {
 	// If cache hit and PROD, return hit
-	if hit, isCached := cacheMap.Load(config); isCached && !common.KirunaEnv.GetIsDev() {
+	if hit, isCached := criticalCSSCacheMap.Load(config); isCached && !common.KirunaEnv.GetIsDev() {
 		hit.mu.RLock()
 		defer hit.mu.RUnlock()
 		if hit.noSuchFile {
@@ -99,7 +105,7 @@ func GetCriticalCSSStyleElement(config *common.Config) template.HTML {
 
 	// Get critical CSS
 	css := GetCriticalCSS(config)
-	cached, _ := cacheMap.Load(config)
+	cached, _ := criticalCSSCacheMap.Load(config)
 
 	cached.mu.RLock()
 	noSuchFile := cached.noSuchFile
@@ -111,12 +117,18 @@ func GetCriticalCSSStyleElement(config *common.Config) template.HTML {
 	}
 
 	// Create style element
-	el := template.HTML(fmt.Sprintf("<style id=\"%s\">%s</style>", CriticalCSSElementID, css))
+	var sb strings.Builder
+	sb.WriteString(`<style id="`)
+	sb.WriteString(CriticalCSSElementID)
+	sb.WriteString(`">`)
+	sb.WriteString(css)
+	sb.WriteString("</style>")
+	el := template.HTML(sb.String())
 
 	cached.mu.Lock()
+	defer cached.mu.Unlock()
 	cached.styleEl = el           // Cache the element
 	cached.styleElIsCached = true // Set element as cached
-	cached.mu.Unlock()
 
 	return el
 }
@@ -126,9 +138,9 @@ func GetCriticalCSSStyleElement(config *common.Config) template.HTML {
 ////////////////////////////////////////////////////////////////////////////////
 
 var (
-	fileMapFromGlobCacheMap = typed.SyncMap[string, map[string]string]{}
-	fileMapLoadOnce         = typed.SyncMap[string, *sync.Once]{}
-	urlCacheMap             = typed.SyncMap[string, string]{}
+	fileMapFromGobCacheMap = typed.SyncMap[string, map[string]string]{}
+	fileMapLoadOnce        = typed.SyncMap[string, *sync.Once]{}
+	urlCacheMap            = typed.SyncMap[string, string]{}
 )
 
 func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool) string {
@@ -140,32 +152,36 @@ func GetPublicURL(config *common.Config, originalPublicURL string, useDirFS bool
 	}
 
 	once, _ := fileMapLoadOnce.LoadOrStore(fileMapKey, &sync.Once{})
+	var fileMapFromGob map[string]string
 	once.Do(func() {
-		fileMapFromGob, err := LoadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
+		var err error
+		fileMapFromGob, err = LoadMapFromGob(config, common.PublicFileMapGobName, useDirFS)
 		if err != nil {
-			util.Log.Errorf("error loading file map from gob: %v", err)
+			config.Logger.Errorf("error loading file map from gob: %v", err)
 			return
 		}
-		fileMapFromGlobCacheMap.Store(fileMapKey, fileMapFromGob)
+		fileMapFromGobCacheMap.Store(fileMapKey, fileMapFromGob)
 	})
 
-	fileMap, _ := fileMapFromGlobCacheMap.Load(fileMapKey)
-	if fileMap == nil {
+	if fileMapFromGob == nil {
+		fileMapFromGob, _ = fileMapFromGobCacheMap.Load(fileMapKey)
+	}
+	if fileMapFromGob == nil {
 		return originalPublicURL
 	}
 
-	if hashedURL, existsInFileMap := fileMap[cleanURL(originalPublicURL)]; existsInFileMap {
-		finalURL := "/public/" + hashedURL
+	if hashedURL, existsInFileMap := fileMapFromGob[cleanURL(originalPublicURL)]; existsInFileMap {
+		finalURL := "/" + publicDir + "/" + hashedURL
 		urlCacheMap.Store(urlKey, finalURL) // Cache the hashed URL
 		return finalURL
 	}
 
 	// If no hashed URL found, return the original URL
-	util.Log.Infof(
+	config.Logger.Infof(
 		"GetPublicURL: no hashed URL found for %s, returning original URL",
 		originalPublicURL,
 	)
-	finalURL := "/public/" + originalPublicURL
+	finalURL := "/" + publicDir + "/" + originalPublicURL
 	urlCacheMap.Store(urlKey, finalURL) // Cache the original URL
 	return finalURL
 }
@@ -200,9 +216,9 @@ func cleanURL(url string) string {
 ////////////////////////////////////////////////////////////////////////////////
 
 func GetServeStaticHandler(config *common.Config, pathPrefix string, cacheImmutably bool) http.Handler {
-	FS, err := GetFS(config, "public")
+	FS, err := GetFS(config, publicDir)
 	if err != nil {
-		util.Log.Errorf("error getting public FS: %v", err)
+		config.Logger.Errorf("error getting public FS: %v", err)
 	}
 	if cacheImmutably {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -228,18 +244,18 @@ func GetStyleSheetURL(config *common.Config) string {
 
 	fs, err := GetUniversalFS(config)
 	if err != nil {
-		util.Log.Errorf("error getting FS: %v", err)
+		config.Logger.Errorf("error getting FS: %v", err)
 		return ""
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(filepath.Join("internal", "normal_css_file_ref.txt"))
+	content, err := fs.ReadFile(filepath.Join(internalDir, normalCSSFileRefFile))
 	if err != nil {
-		util.Log.Errorf("error reading normal CSS URL: %v", err)
+		config.Logger.Errorf("error reading normal CSS URL: %v", err)
 		return ""
 	}
 
-	url := "/public/" + string(content)
+	url := "/" + publicDir + "/" + string(content)
 	styleSheetURLCacheMap.Store(config, url) // Cache the URL
 	return url
 }
@@ -257,9 +273,14 @@ func GetStyleSheetLinkElement(config *common.Config) template.HTML {
 		return ""
 	}
 
-	el := template.HTML(fmt.Sprintf(
-		"<link rel=\"stylesheet\" href=\"%s\" id=\"%s\" />", url, StyleSheetElementID,
-	))
+	var sb strings.Builder
+	sb.WriteString(`<link rel="stylesheet" href="`)
+	sb.WriteString(url)
+	sb.WriteString(`" id="`)
+	sb.WriteString(StyleSheetElementID)
+	sb.WriteString(`" />`)
+	el := template.HTML(sb.String())
+
 	styleSheetElementCacheMap.Store(config, el) // Cache the element
 	return el
 }
@@ -269,7 +290,7 @@ func GetStyleSheetLinkElement(config *common.Config) template.HTML {
 ////////////////////////////////////////////////////////////////////////////////
 
 func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (map[string]string, error) {
-	var FS *UniversalFS
+	var FS UniversalFSInterface
 	var err error
 	if useDirFS {
 		FS = GetUniversalDirFS(config)
@@ -281,7 +302,7 @@ func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (m
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	file, err := FS.Open(filepath.Join("internal", gobFileName))
+	file, err := FS.Open(filepath.Join(internalDir, gobFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %v", err)
 	}
@@ -300,11 +321,18 @@ func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (m
 /////// FS
 ////////////////////////////////////////////////////////////////////////////////
 
+type UniversalFSInterface interface {
+	ReadFile(name string) ([]byte, error)
+	Open(name string) (fs.File, error)
+	ReadDir(name string) ([]fs.DirEntry, error)
+	Sub(dir string) (UniversalFSInterface, error)
+}
+
 type UniversalFS struct {
 	FS fs.FS
 }
 
-func newUniversalFS(fs fs.FS) *UniversalFS {
+func newUniversalFS(fs fs.FS) UniversalFSInterface {
 	return &UniversalFS{FS: fs}
 }
 
@@ -320,22 +348,21 @@ func (u *UniversalFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return fs.ReadDir(u.FS, name)
 }
 
-func (u *UniversalFS) Sub(dir string) (*UniversalFS, error) {
+func (u *UniversalFS) Sub(dir string) (UniversalFSInterface, error) {
 	subFS, err := fs.Sub(u.FS, dir)
 	if err != nil {
 		return nil, err
 	}
-	FS := newUniversalFS(subFS)
-	return FS, nil
+	return newUniversalFS(subFS), nil
 }
 
-var uniFSCacheMap = typed.SyncMap[*common.Config, *UniversalFS]{}
+var uniFSCacheMap = typed.SyncMap[*common.Config, UniversalFSInterface]{}
 
 const fsTypeDev = "dev"
 
 var fsTypeCacheMap = typed.SyncMap[*common.Config, string]{}
 
-func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
+func GetUniversalFS(config *common.Config) (UniversalFSInterface, error) {
 	if hit, isCached := uniFSCacheMap.Load(config); isCached {
 		cachedFSType, _ := fsTypeCacheMap.Load(config)
 		skipCache := common.KirunaEnv.GetIsDev() && cachedFSType != fsTypeDev
@@ -351,8 +378,8 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 		// ensures "needsReset" is always true in dev
 		fsTypeCacheMap.Store(config, fsTypeDev)
 
-		util.Log.Infof("using disk file system (development)")
-		fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist/kiruna")))
+		config.Logger.Infof("using disk file system (development)")
+		fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), distKirunaDir)))
 		actualFS, _ := uniFSCacheMap.LoadOrStore(config, fs) // cache the fs
 		return actualFS, nil
 	}
@@ -360,7 +387,7 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// PROD
 	// If we are using the embedded file system, we should use the dist file system
 	if config.GetIsUsingEmbeddedFS() {
-		util.Log.Infof("using embedded file system (production)")
+		config.Logger.Infof("using embedded file system (production)")
 
 		// Assuming the embed directive looks like this:
 		// //go:embed kiruna
@@ -378,7 +405,7 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	// PROD
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
-	util.Log.Infof("using disk file system (production)")
+	config.Logger.Infof("using disk file system (production)")
 	execDir, err := executil.GetExecutableDir()
 	if err != nil {
 		return nil, err
@@ -388,32 +415,32 @@ func GetUniversalFS(config *common.Config) (*UniversalFS, error) {
 	return actualFS, nil
 }
 
-func GetFS(config *common.Config, subDir string) (*UniversalFS, error) {
+func GetFS(config *common.Config, subDir string) (UniversalFSInterface, error) {
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	path := filepath.Join("static", subDir)
+	path := filepath.Join(staticDir, subDir)
 
 	FS, err := GetUniversalFS(config)
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)
-		util.Log.Errorf(errMsg)
+		config.Logger.Errorf(errMsg)
 		return nil, errors.New(errMsg)
 	}
 	subFS, err := FS.Sub(path)
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)
-		util.Log.Errorf(errMsg)
+		config.Logger.Errorf(errMsg)
 		return nil, errors.New(errMsg)
 	}
 	return subFS, nil
 }
 
-var uniDirFSCacheMap = typed.SyncMap[*common.Config, *UniversalFS]{}
+var uniDirFSCacheMap = typed.SyncMap[*common.Config, UniversalFSInterface]{}
 
-func GetUniversalDirFS(config *common.Config) *UniversalFS {
+func GetUniversalDirFS(config *common.Config) UniversalFSInterface {
 	if hit, isCached := uniDirFSCacheMap.Load(config); isCached {
 		return hit
 	}
-	fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), "dist/kiruna")))
+	fs := newUniversalFS(os.DirFS(path.Join(config.GetCleanRootDir(), distKirunaDir)))
 	actualFS, _ := uniDirFSCacheMap.LoadOrStore(config, fs)
 	return actualFS
 }
