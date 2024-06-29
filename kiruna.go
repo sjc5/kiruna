@@ -24,10 +24,10 @@ func (k Kiruna) Build() error {
 func (k Kiruna) BuildWithoutCompilingGo() error {
 	return buildtime.Build(k.Config, false, false)
 }
-func (k Kiruna) GetPublicFS() (runtime.UniversalFSInterface, error) {
+func (k Kiruna) GetPublicFS() (runtime.UniversalFS, error) {
 	return runtime.GetFS(k.Config, "public")
 }
-func (k Kiruna) GetPrivateFS() (runtime.UniversalFSInterface, error) {
+func (k Kiruna) GetPrivateFS() (runtime.UniversalFS, error) {
 	return runtime.GetFS(k.Config, "private")
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
@@ -63,7 +63,7 @@ func (k Kiruna) GetCriticalCSSElementID() string {
 func (k Kiruna) GetStyleSheetElementID() string {
 	return runtime.StyleSheetElementID
 }
-func (k Kiruna) GetUniversalFS() (runtime.UniversalFSInterface, error) {
+func (k Kiruna) GetUniversalFS() (runtime.UniversalFS, error) {
 	return runtime.GetUniversalFS(k.Config)
 }
 func (k Kiruna) GetCriticalCSSStyleElement() template.HTML {

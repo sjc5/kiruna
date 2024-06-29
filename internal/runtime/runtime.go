@@ -68,9 +68,10 @@ func GetCriticalCSS(config *common.Config) string {
 	// Read critical CSS
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	content, err := fs.ReadFile(filepath.Join(internalDir, criticalCSSFile))
+	cachedStatus.mu.Lock()
+	defer cachedStatus.mu.Unlock()
+
 	if err != nil {
-		cachedStatus.mu.Lock()
-		defer cachedStatus.mu.Unlock()
 		// Check if the error is a non-existent file, and set the noSuchFile flag in the cache
 		cachedStatus.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
 
@@ -82,9 +83,6 @@ func GetCriticalCSS(config *common.Config) string {
 	}
 
 	criticalCSS := string(content)
-
-	cachedStatus.mu.Lock()
-	defer cachedStatus.mu.Unlock()
 	cachedStatus.codeStr = criticalCSS // Cache the critical CSS
 
 	return criticalCSS
@@ -290,7 +288,7 @@ func GetStyleSheetLinkElement(config *common.Config) template.HTML {
 ////////////////////////////////////////////////////////////////////////////////
 
 func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (map[string]string, error) {
-	var FS UniversalFSInterface
+	var FS UniversalFS
 	var err error
 	if useDirFS {
 		FS = GetUniversalDirFS(config)
@@ -304,7 +302,7 @@ func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (m
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	file, err := FS.Open(filepath.Join(internalDir, gobFileName))
 	if err != nil {
-		return nil, fmt.Errorf("error opening file: %v", err)
+		return nil, fmt.Errorf("error opening file %s: %v", gobFileName, err)
 	}
 
 	defer file.Close()
@@ -321,34 +319,34 @@ func LoadMapFromGob(config *common.Config, gobFileName string, useDirFS bool) (m
 /////// FS
 ////////////////////////////////////////////////////////////////////////////////
 
-type UniversalFSInterface interface {
+type UniversalFS interface {
 	ReadFile(name string) ([]byte, error)
 	Open(name string) (fs.File, error)
 	ReadDir(name string) ([]fs.DirEntry, error)
-	Sub(dir string) (UniversalFSInterface, error)
+	Sub(dir string) (UniversalFS, error)
 }
 
-type UniversalFS struct {
+type universalFS struct {
 	FS fs.FS
 }
 
-func newUniversalFS(fs fs.FS) UniversalFSInterface {
-	return &UniversalFS{FS: fs}
+func newUniversalFS(fs fs.FS) UniversalFS {
+	return &universalFS{FS: fs}
 }
 
-func (u *UniversalFS) ReadFile(name string) ([]byte, error) {
+func (u *universalFS) ReadFile(name string) ([]byte, error) {
 	return fs.ReadFile(u.FS, name)
 }
 
-func (u *UniversalFS) Open(name string) (fs.File, error) {
+func (u *universalFS) Open(name string) (fs.File, error) {
 	return u.FS.Open(name)
 }
 
-func (u *UniversalFS) ReadDir(name string) ([]fs.DirEntry, error) {
+func (u *universalFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return fs.ReadDir(u.FS, name)
 }
 
-func (u *UniversalFS) Sub(dir string) (UniversalFSInterface, error) {
+func (u *universalFS) Sub(dir string) (UniversalFS, error) {
 	subFS, err := fs.Sub(u.FS, dir)
 	if err != nil {
 		return nil, err
@@ -356,13 +354,15 @@ func (u *UniversalFS) Sub(dir string) (UniversalFSInterface, error) {
 	return newUniversalFS(subFS), nil
 }
 
-var uniFSCacheMap = typed.SyncMap[*common.Config, UniversalFSInterface]{}
+var uniFSCacheMap = typed.SyncMap[*common.Config, UniversalFS]{}
 
 const fsTypeDev = "dev"
 
 var fsTypeCacheMap = typed.SyncMap[*common.Config, string]{}
 
-func GetUniversalFS(config *common.Config) (UniversalFSInterface, error) {
+// GetUniversalFS returns a filesystem interface that works across different environments (dev/prod)
+// and supports both embedded and non-embedded filesystems.
+func GetUniversalFS(config *common.Config) (UniversalFS, error) {
 	if hit, isCached := uniFSCacheMap.Load(config); isCached {
 		cachedFSType, _ := fsTypeCacheMap.Load(config)
 		skipCache := common.KirunaEnv.GetIsDev() && cachedFSType != fsTypeDev
@@ -415,7 +415,7 @@ func GetUniversalFS(config *common.Config) (UniversalFSInterface, error) {
 	return actualFS, nil
 }
 
-func GetFS(config *common.Config, subDir string) (UniversalFSInterface, error) {
+func GetFS(config *common.Config, subDir string) (UniversalFS, error) {
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	path := filepath.Join(staticDir, subDir)
 
@@ -434,9 +434,9 @@ func GetFS(config *common.Config, subDir string) (UniversalFSInterface, error) {
 	return subFS, nil
 }
 
-var uniDirFSCacheMap = typed.SyncMap[*common.Config, UniversalFSInterface]{}
+var uniDirFSCacheMap = typed.SyncMap[*common.Config, UniversalFS]{}
 
-func GetUniversalDirFS(config *common.Config) UniversalFSInterface {
+func GetUniversalDirFS(config *common.Config) UniversalFS {
 	if hit, isCached := uniDirFSCacheMap.Load(config); isCached {
 		return hit
 	}
