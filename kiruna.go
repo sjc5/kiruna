@@ -25,10 +25,10 @@ func (k Kiruna) BuildWithoutCompilingGo() error {
 	return buildtime.Build(k.Config, false, false)
 }
 func (k Kiruna) GetPublicFS() (*runtime.UniversalFS, error) {
-	return runtime.GetPublicFS(k.Config)
+	return runtime.GetFS(k.Config, "public")
 }
 func (k Kiruna) GetPrivateFS() (*runtime.UniversalFS, error) {
-	return runtime.GetPrivateFS(k.Config)
+	return runtime.GetFS(k.Config, "private")
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 	return runtime.GetPublicURL(k.Config, originalPublicURL, false)

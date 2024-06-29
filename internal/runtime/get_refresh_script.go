@@ -6,10 +6,25 @@ import (
 	"github.com/sjc5/kiruna/internal/common"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+/////// GET REFRESH SCRIPT
+////////////////////////////////////////////////////////////////////////////////
+
 func GetRefreshScriptInner(port int) string {
-	// changeTypes: "rebuilding", "other", "normal", "critical"
-	// Element IDs: "__refreshscript-rebuilding", "__normal-css", "__critical-css"
-	return fmt.Sprintf(`
+	return fmt.Sprintf(refreshScriptFmt, port)
+}
+
+func GetRefreshScript(config *common.Config) string {
+	if !common.KirunaEnv.GetIsDev() {
+		return ""
+	}
+	inner := GetRefreshScriptInner(common.KirunaEnv.GetRefreshServerPort())
+	return "\n<script>\n" + inner + "\n</script>"
+}
+
+// changeTypes: "rebuilding", "other", "normal", "critical"
+// Element IDs: "__refreshscript-rebuilding", "__normal-css", "__critical-css"
+const refreshScriptFmt = `
 function base64ToUTF8(base64) {
   const bytes = Uint8Array.from(atob(base64), (m) => m.codePointAt(0) || 0);
   return new TextDecoder().decode(bytes);
@@ -88,13 +103,4 @@ es.addEventListener("error", (e) => {
 window.addEventListener("beforeunload", () => {
 	es.close();
 });
-`, port)
-}
-
-func GetRefreshScript(config *common.Config) string {
-	if !common.KirunaEnv.GetIsDev() {
-		return ""
-	}
-	inner := GetRefreshScriptInner(common.KirunaEnv.GetRefreshServerPort())
-	return "\n<script>\n" + inner + "\n</script>"
-}
+`
