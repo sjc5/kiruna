@@ -3,6 +3,8 @@ package common
 import (
 	"io/fs"
 	"path/filepath"
+
+	"github.com/sjc5/kit/pkg/colorlog"
 )
 
 const (
@@ -14,10 +16,7 @@ const (
 
 type Callback func() error
 
-type Logger interface {
-	Infof(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-}
+type Logger = colorlog.Logger
 
 type Config struct {
 	/*

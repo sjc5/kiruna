@@ -20,12 +20,12 @@ func MustStartDev(config *common.Config) {
 	// Short circuit if no dev config
 	if config.DevConfig == nil {
 		errMsg := "error: no dev config found"
-		util.Log.Error(errMsg)
+		config.Logger.Error(errMsg)
 		panic(errMsg)
 	}
 
 	if len(config.DevConfig.HealthcheckEndpoint) == 0 {
-		util.Log.Warning(healthCheckWarning)
+		config.Logger.Warning(healthCheckWarning)
 		config.DevConfig.HealthcheckEndpoint = "/"
 	}
 
@@ -39,14 +39,14 @@ func MustStartDev(config *common.Config) {
 	if freePort, err := util.GetFreePort(defaultFreePort); err == nil {
 		common.KirunaEnv.SetRefreshServerPort(freePort)
 	} else {
-		util.Log.Errorf("error: failed to get free port for refresh server: %v", err)
+		config.Logger.Errorf("error: failed to get free port for refresh server: %v", err)
 		panic(err)
 	}
 
 	err := buildtime.Build(config, false, false)
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to build app: %v", err)
-		util.Log.Error(errMsg)
+		config.Logger.Error(errMsg)
 		panic(errMsg)
 	}
 
@@ -55,7 +55,7 @@ func MustStartDev(config *common.Config) {
 		return
 	}
 
-	util.Log.Infof("initializing sidecar refresh server on port %d", common.KirunaEnv.GetRefreshServerPort())
+	config.Logger.Infof("initializing sidecar refresh server on port %d", common.KirunaEnv.GetRefreshServerPort())
 
 	manager := NewClientManager()
 	go manager.start()
@@ -76,7 +76,7 @@ func MustStartDev(config *common.Config) {
 
 	if err := http.ListenAndServe(":"+strconv.Itoa(common.KirunaEnv.GetRefreshServerPort()), mux); err != nil {
 		errMsg := fmt.Sprintf("error: failed to start refresh server: %v", err)
-		util.Log.Error(errMsg)
+		config.Logger.Error(errMsg)
 		panic(errMsg)
 	}
 }

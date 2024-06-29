@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/sjc5/kiruna/internal/common"
-	"github.com/sjc5/kiruna/internal/util"
 )
 
 // If you want to do a custom build command, just use
@@ -24,6 +23,6 @@ func CompileBinary(config *common.Config) error {
 	if err != nil {
 		return fmt.Errorf("error compiling binary: %v", err)
 	}
-	util.Log.Infof("compilation complete: %s", buildDest)
+	config.Logger.Infof("compilation complete: %s", buildDest)
 	return nil
 }

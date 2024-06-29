@@ -7,12 +7,11 @@ import (
 	"path/filepath"
 
 	"github.com/sjc5/kiruna/internal/common"
-	"github.com/sjc5/kiruna/internal/util"
 )
 
 var lastBuildCmd *exec.Cmd
 
-func mustKillAppDev() {
+func mustKillAppDev(config *common.Config) {
 	if lastBuildCmd != nil {
 		if err := lastBuildCmd.Process.Kill(); err != nil {
 			errMsg := fmt.Sprintf(
@@ -20,7 +19,7 @@ func mustKillAppDev() {
 				lastBuildCmd.Process.Pid,
 				err,
 			)
-			util.Log.Error(errMsg)
+			config.Logger.Error(errMsg)
 			panic(errMsg)
 		}
 	}
@@ -33,8 +32,8 @@ func mustStartAppDev(config *common.Config) {
 	lastBuildCmd.Stderr = os.Stderr
 	if err := lastBuildCmd.Start(); err != nil {
 		errMsg := fmt.Sprintf("error: failed to start app: %v", err)
-		util.Log.Error(errMsg)
+		config.Logger.Error(errMsg)
 		panic(errMsg)
 	}
-	util.Log.Infof("app started with pid %d", lastBuildCmd.Process.Pid)
+	config.Logger.Infof("app started with pid %d", lastBuildCmd.Process.Pid)
 }
