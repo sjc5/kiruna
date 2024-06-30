@@ -1,36 +1,37 @@
-package util
+package ik
 
 import (
 	"fmt"
 	"log"
 	"net"
-
-	"github.com/sjc5/kiruna/internal/common"
 )
 
-const maxOffset = 1024
+const (
+	maxOffset       = 1024
+	defaultFreePort = 10_000
+)
 
 func MustGetPort() int {
-	isDev := common.KirunaEnv.GetIsDev()
-	portHasBeenSet := common.KirunaEnv.GetPortHasBeenSet()
-	defaultPort := common.KirunaEnv.GetPort()
+	isDev := KirunaEnv.GetIsDev()
+	portHasBeenSet := KirunaEnv.getPortHasBeenSet()
+	defaultPort := KirunaEnv.getPort()
 
 	if !isDev || portHasBeenSet {
 		return defaultPort
 	}
 
-	port, err := GetFreePort(defaultPort)
+	port, err := getFreePort(defaultPort)
 	if err != nil {
 		log.Panicf("error: failed to get free port: %v", err)
 	}
 
-	common.KirunaEnv.SetPort(port)
-	common.KirunaEnv.SetPortHasBeenSet()
+	KirunaEnv.setPort(port)
+	KirunaEnv.setPortHasBeenSet()
 
 	return port
 }
 
-func GetFreePort(defaultPort int) (int, error) {
+func getFreePort(defaultPort int) (int, error) {
 	if defaultPort == 0 {
 		defaultPort = 8080
 	}
@@ -43,7 +44,7 @@ func GetFreePort(defaultPort int) (int, error) {
 		port := defaultPort + i
 		if port >= 0 && port <= 65535 {
 			if port, err := checkPortAvailability(port); err == nil {
-				Log.Warningf(
+				Log.Warning(
 					"port %d unavailable: falling back to port %d",
 					defaultPort,
 					port,

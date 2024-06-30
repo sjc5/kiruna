@@ -4,34 +4,35 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/sjc5/kiruna/internal/buildtime"
-	"github.com/sjc5/kiruna/internal/common"
-	"github.com/sjc5/kiruna/internal/dev"
-	"github.com/sjc5/kiruna/internal/runtime"
-	"github.com/sjc5/kiruna/internal/util"
+	ik "github.com/sjc5/kiruna/internal/kiruna"
 )
 
-type Config = common.Config
-type DevConfig = common.DevConfig
+type Config = ik.Config
+type DevConfig = ik.DevConfig
 
 type Kiruna struct {
-	Config *common.Config
+	Config *ik.Config
 }
 
+// If you want to do a custom build command, just use
+// Kiruna.BuildWithoutCompilingGo() instead of Kiruna.Build(),
+// and then you can control your build yourself afterwards.
+
 func (k Kiruna) Build() error {
-	return buildtime.Build(k.Config, true, false)
+	return k.Config.Build(true, false)
 }
 func (k Kiruna) BuildWithoutCompilingGo() error {
-	return buildtime.Build(k.Config, false, false)
+	return k.Config.Build(false, false)
 }
-func (k Kiruna) GetPublicFS() (*runtime.UniversalFS, error) {
-	return runtime.GetFS(k.Config, "public")
+
+func (k Kiruna) GetPublicFS() (ik.UniversalFS, error) {
+	return k.Config.GetPublicFS()
 }
-func (k Kiruna) GetPrivateFS() (*runtime.UniversalFS, error) {
-	return runtime.GetFS(k.Config, "private")
+func (k Kiruna) GetPrivateFS() (ik.UniversalFS, error) {
+	return k.Config.GetPrivateFS()
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
-	return runtime.GetPublicURL(k.Config, originalPublicURL, false)
+	return k.Config.GetPublicURL(originalPublicURL, false)
 }
 
 /*
@@ -42,58 +43,61 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
  * pass a map of public URLs to a Go template.
  */
 func (k Kiruna) MakePublicURLsMap(filepaths []string) map[string]string {
-	return runtime.MakePublicURLsMap(k.Config, filepaths, false)
+	return k.Config.MakePublicURLsMap(filepaths, false)
 }
-func (k Kiruna) MustStartDev(devConfig *common.DevConfig) {
+func (k Kiruna) MustStartDev(devConfig *ik.DevConfig) {
 	k.Config.DevConfig = devConfig
-	dev.MustStartDev(k.Config)
+	k.Config.MustStartDev()
 }
 func (k Kiruna) GetCriticalCSS() template.CSS {
-	return template.CSS(runtime.GetCriticalCSS(k.Config))
+	return template.CSS(k.Config.GetCriticalCSS())
 }
 func (k Kiruna) GetStyleSheetURL() string {
-	return runtime.GetStyleSheetURL(k.Config)
+	return k.Config.GetStyleSheetURL()
 }
 func (k Kiruna) GetRefreshScript() template.HTML {
-	return template.HTML(runtime.GetRefreshScript(k.Config))
+	return template.HTML(ik.GetRefreshScript(k.Config))
 }
 func (k Kiruna) GetCriticalCSSElementID() string {
-	return runtime.CriticalCSSElementID
+	return ik.CriticalCSSElementID
 }
 func (k Kiruna) GetStyleSheetElementID() string {
-	return runtime.StyleSheetElementID
+	return ik.StyleSheetElementID
 }
-func (k Kiruna) GetUniversalFS() (*runtime.UniversalFS, error) {
-	return runtime.GetUniversalFS(k.Config)
+func (k Kiruna) GetUniversalFS() (ik.UniversalFS, error) {
+	return k.Config.GetUniversalFS()
 }
 func (k Kiruna) GetCriticalCSSStyleElement() template.HTML {
-	return runtime.GetCriticalCSSStyleElement(k.Config)
+	return k.Config.GetCriticalCSSStyleElement()
 }
 func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
-	return runtime.GetStyleSheetLinkElement(k.Config)
+	return k.Config.GetStyleSheetLinkElement()
 }
 func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
-	return runtime.GetServeStaticHandler(k.Config, pathPrefix, cacheImmutably)
+	return k.Config.GetServeStaticHandler(pathPrefix, cacheImmutably)
 }
 
-func New(config *common.Config) *Kiruna {
+func New(config *ik.Config) *Kiruna {
+	if config.Logger == nil {
+		config.Logger = &ik.Log
+	}
 	return &Kiruna{
 		Config: config,
 	}
 }
 
-type WatchedFile = common.WatchedFile
-type WatchedFiles = common.WatchedFiles
-type OnChangeFunc = common.OnChangeFunc
-type OnChange = common.OnChange
-type IgnorePatterns = common.IgnorePatterns
-type UniversalFS = runtime.UniversalFS
+type WatchedFile = ik.WatchedFile
+type WatchedFiles = ik.WatchedFiles
+type OnChangeFunc = ik.OnChangeFunc
+type OnChange = ik.OnChange
+type IgnorePatterns = ik.IgnorePatterns
+type UniversalFS = ik.UniversalFS
 
-const OnChangeStrategyConcurrent = common.OnChangeStrategyConcurrent
-const OnChangeStrategyPost = common.OnChangeStrategyPost
-const OnChangeStrategyPre = common.OnChangeStrategyPre
-const OnChangeStrategyConcurrentNoWait = common.OnChangeStrategyConcurrentNoWait
+const OnChangeStrategyConcurrent = ik.OnChangeStrategyConcurrent
+const OnChangeStrategyPost = ik.OnChangeStrategyPost
+const OnChangeStrategyPre = ik.OnChangeStrategyPre
+const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
 
-var SetupDistDir = buildtime.SetupDistDir
-var MustGetPort = util.MustGetPort
-var GetIsDev = common.KirunaEnv.GetIsDev
+var SetupDistDir = ik.SetupDistDir
+var MustGetPort = ik.MustGetPort
+var GetIsDev = ik.KirunaEnv.GetIsDev
