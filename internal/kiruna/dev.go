@@ -18,10 +18,48 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+// Debouncer to handle event batching
+type Debouncer struct {
+	mu       sync.Mutex
+	timer    *time.Timer
+	events   []fsnotify.Event
+	duration time.Duration
+	callback func(events []fsnotify.Event)
+}
+
+func NewDebouncer(duration time.Duration, callback func(events []fsnotify.Event)) *Debouncer {
+	return &Debouncer{
+		duration: duration,
+		callback: callback,
+	}
+}
+
+func (d *Debouncer) AddEvent(event fsnotify.Event) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.events = append(d.events, event)
+
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+
+	d.timer = time.AfterFunc(d.duration, func() {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+
+		if len(d.events) > 0 {
+			d.callback(d.events)
+			d.events = nil
+		}
+	})
+}
+
 var (
 	naiveIgnoreDirPatterns = [4]string{"**/.git", "**/node_modules", "dist/bin", distKirunaDir}
 	ignoredDirPatterns     = []string{}
 	ignoredFilePatterns    = []string{}
+	defaultWatchedFile     = WatchedFile{}
 	defaultWatchedFiles    = []WatchedFile{}
 )
 
@@ -263,35 +301,93 @@ func (c *Config) mustStartAppDev() {
 }
 
 func (c *Config) mustHandleWatcherEmissions(manager *ClientManager, watcher *fsnotify.Watcher) {
+	debouncer := NewDebouncer(10*time.Millisecond, func(events []fsnotify.Event) {
+		c.processBatchedEvents(manager, watcher, events)
+	})
+
 	for {
 		select {
 		case evt := <-watcher.Events:
-			time.Sleep(10 * time.Millisecond) // let the file system settle
-
-			fileInfo, _ := os.Stat(evt.Name) // no need to check error, because we want to process either way
-			if fileInfo != nil && fileInfo.IsDir() {
-				if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
-					if err := c.addDirs(watcher, evt.Name); err != nil {
-						c.Logger.Errorf("error: failed to add directory to watcher: %v", err)
-						continue
-					}
-				}
-				continue
-			}
-
-			evtDetails := c.getEvtDetails(evt)
-			if evtDetails.isIgnored {
-				continue
-			}
-
-			err := c.mustHandleFileChange(manager, evt, evtDetails)
-			if err != nil {
-				c.Logger.Errorf("error: failed to handle file change: %v", err)
-			}
-
+			debouncer.AddEvent(evt)
 		case err := <-watcher.Errors:
 			c.Logger.Errorf("watcher error: %v", err)
 		}
+	}
+}
+
+func (c *Config) processBatchedEvents(manager *ClientManager, watcher *fsnotify.Watcher, events []fsnotify.Event) {
+	fileChanges := make(map[string]fsnotify.Event)
+	for _, evt := range events {
+		fileChanges[evt.Name] = evt
+	}
+
+	hasMultipleEvents := len(fileChanges) > 1
+
+	if hasMultipleEvents {
+		manager.broadcast <- RefreshFilePayload{
+			ChangeType: ChangeTypeRebuilding,
+		}
+	}
+
+	wfcsAlreadyHandled := make(map[*WatchedFile]bool)
+	isGoOrNeedsHardReloadEvenIfNonGo := false
+
+	for _, evt := range fileChanges {
+		fileInfo, _ := os.Stat(evt.Name)
+		if fileInfo != nil && fileInfo.IsDir() {
+			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
+				if err := c.addDirs(watcher, evt.Name); err != nil {
+					c.Logger.Errorf("error: failed to add directory to watcher: %v", err)
+					continue
+				}
+			}
+			continue
+		}
+
+		evtDetails := c.getEvtDetails(evt)
+		if evtDetails.isIgnored {
+			continue
+		}
+
+		if c.getIsNonEmptyCHMODOnly(evt) {
+			continue
+		}
+
+		wfc := evtDetails.matchingWatchedFile
+		if wfc == nil {
+			wfc = &defaultWatchedFile
+		}
+
+		if _, alreadyHandled := wfcsAlreadyHandled[wfc]; alreadyHandled {
+			continue
+		}
+
+		wfcsAlreadyHandled[wfc] = true
+
+		if !isGoOrNeedsHardReloadEvenIfNonGo {
+			isGoOrNeedsHardReloadEvenIfNonGo = evtDetails.isGo
+		}
+		if !isGoOrNeedsHardReloadEvenIfNonGo {
+			isGoOrNeedsHardReloadEvenIfNonGo = wfc.RecompileBinary || wfc.RestartApp
+		}
+
+		err := c.mustHandleFileChange(manager, evt, evtDetails, hasMultipleEvents, wfc)
+		if err != nil {
+			c.Logger.Errorf("error: failed to handle file change: %v", err)
+		}
+	}
+
+	if hasMultipleEvents {
+		if isGoOrNeedsHardReloadEvenIfNonGo {
+			c.mustKillAndRestart()
+			return
+		}
+		c.mustReloadBroadcast(
+			manager,
+			RefreshFilePayload{
+				ChangeType: ChangeTypeOther,
+			},
+		)
 	}
 }
 
@@ -353,18 +449,15 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) EvtDetails {
 	}
 }
 
-func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails,
+func (c *Config) mustHandleFileChange(
+	manager *ClientManager,
+	evt fsnotify.Event,
+	evtDetails EvtDetails,
+	isPartOfBatch bool,
+	wfc *WatchedFile,
 ) error {
-	if c.getIsNonEmptyCHMODOnly(evt) {
-		return nil
-	}
 
-	wfc := evtDetails.matchingWatchedFile
-	if wfc == nil {
-		wfc = &WatchedFile{}
-	}
-
-	if !c.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS {
+	if !c.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS && !isPartOfBatch {
 		manager.broadcast <- RefreshFilePayload{
 			ChangeType: ChangeTypeRebuilding,
 		}
@@ -414,11 +507,11 @@ func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event
 
 	needsHardReloadEvenIfNonGo := wfc.RecompileBinary || wfc.RestartApp
 
-	if evtDetails.isGo || needsHardReloadEvenIfNonGo {
+	if (evtDetails.isGo || needsHardReloadEvenIfNonGo) && !isPartOfBatch {
 		c.mustKillAndRestart()
 	}
 
-	if c.DevConfig.ServerOnly {
+	if c.DevConfig.ServerOnly || isPartOfBatch {
 		return nil
 	}
 
@@ -432,7 +525,6 @@ func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event
 		)
 		return nil
 	}
-
 	// At this point, we know it's a CSS file
 
 	cssType := ChangeTypeNormalCSS
