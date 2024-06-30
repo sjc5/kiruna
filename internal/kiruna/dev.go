@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -253,9 +252,15 @@ func (manager *ClientManager) start() {
 	}
 }
 
-var lastBuildCmd *exec.Cmd // __TODO sync
+var (
+	lastBuildCmd  *exec.Cmd
+	buildCmdMutex sync.Mutex
+)
 
 func (c *Config) mustKillAppDev() {
+	buildCmdMutex.Lock()
+	defer buildCmdMutex.Unlock()
+
 	if lastBuildCmd != nil {
 		if err := lastBuildCmd.Process.Kill(); err != nil {
 			errMsg := fmt.Sprintf(
@@ -288,6 +293,9 @@ func (c *Config) addDirs(watcher *fsnotify.Watcher, path string) error {
 }
 
 func (c *Config) mustStartAppDev() {
+	buildCmdMutex.Lock()
+	defer buildCmdMutex.Unlock()
+
 	buildDest := filepath.Join(c.getCleanRootDir(), "dist/bin/main")
 	lastBuildCmd = exec.Command(buildDest)
 	lastBuildCmd.Stdout = os.Stdout
@@ -620,8 +628,6 @@ func (c *Config) mustReloadBroadcast(manager *ClientManager, rfp RefreshFilePayl
 	panic(errMsg)
 }
 
-var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
-
 func (c *Config) getIsEmptyFile(evt fsnotify.Event) bool {
 	file, err := os.Open(evt.Name)
 	if err != nil {
@@ -651,8 +657,13 @@ func (c *Config) runOtherFileBuild(wfc *WatchedFile) error {
 	return nil
 }
 
+const (
+	maxReadinessAttempts = 100
+	baseReadinessDelay   = 20 * time.Millisecond
+)
+
 func (c *Config) waitForAppReadiness() bool {
-	for attempts := 0; attempts < 100; attempts++ {
+	for attempts := 0; attempts < maxReadinessAttempts; attempts++ {
 		url := fmt.Sprintf(
 			"http://localhost:%d%s",
 			MustGetPort(),
@@ -664,8 +675,8 @@ func (c *Config) waitForAppReadiness() bool {
 			return true
 		}
 
-		additionalDelay := time.Duration(attempts * 20)
-		time.Sleep(20*time.Millisecond + additionalDelay*time.Millisecond)
+		additionalDelay := time.Duration(attempts) * baseReadinessDelay
+		time.Sleep(baseReadinessDelay + additionalDelay)
 	}
 	return false
 }

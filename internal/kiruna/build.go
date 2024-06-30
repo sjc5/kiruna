@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -106,6 +107,8 @@ func (c *Config) BuildCSS() error {
 
 	return nil
 }
+
+var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
 
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func (c *Config) ProcessCSS(subDir string) error {
