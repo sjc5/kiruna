@@ -32,8 +32,16 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	cleanRootDir := c.getCleanRootDir()
 
 	if !shouldBeGranular {
+
+		// check for existing PID file
+		pidFile := PIDFile{cleanRootDir: cleanRootDir}
+		lastPID, err := pidFile.readPIDFile()
+		if err != nil {
+			return fmt.Errorf("error reading PID file: %v", err)
+		}
+
 		// nuke the dist/kiruna directory
-		err := os.RemoveAll(filepath.Join(cleanRootDir, distKirunaDir))
+		err = os.RemoveAll(filepath.Join(cleanRootDir, distKirunaDir))
 		if err != nil {
 			return fmt.Errorf("error removing dist/kiruna directory: %v", err)
 		}
@@ -44,6 +52,14 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 			err = SetupDistDir(c.RootDir)
 			if err != nil {
 				return fmt.Errorf("error making requisite directories: %v", err)
+			}
+		}
+
+		// add pid file back
+		if lastPID != 0 {
+			err = pidFile.writePIDFile(lastPID)
+			if err != nil {
+				return fmt.Errorf("error writing PID file: %v", err)
 			}
 		}
 	}

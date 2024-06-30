@@ -44,7 +44,7 @@ func getFreePort(defaultPort int) (int, error) {
 		port := defaultPort + i
 		if port >= 0 && port <= 65535 {
 			if port, err := checkPortAvailability(port); err == nil {
-				Log.Warning(
+				Log.Warningf(
 					"port %d unavailable: falling back to port %d",
 					defaultPort,
 					port,
