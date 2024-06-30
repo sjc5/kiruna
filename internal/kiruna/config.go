@@ -1,22 +1,12 @@
-package common
+package ik
 
 import (
 	"io/fs"
-	"path/filepath"
 
 	"github.com/sjc5/kit/pkg/colorlog"
 )
 
-const (
-	PublicFileMapGobName  = "public_file_map.gob"
-	PrivateFileMapGobName = "private_file_map.gob"
-	CSSNormalDirName      = "normal"
-	CSSCriticalDirName    = "critical"
-)
-
-type Callback func() error
-
-type Logger = colorlog.Logger
+type Logger colorlog.Logger
 
 type Config struct {
 	/*
@@ -51,36 +41,11 @@ type Config struct {
 	Logger Logger
 }
 
-func (c *Config) GetIsUsingEmbeddedFS() bool {
-	return c.DistFS != nil
-}
-func (c *Config) GetCleanRootDir() string {
-	return filepath.Clean(c.RootDir)
-}
-
-type IgnorePatterns struct {
-	Dirs  []string // Glob patterns
-	Files []string // Glob patterns
-}
-
 type DevConfig struct {
 	HealthcheckEndpoint string // e.g., "/healthz" -- should return 200 OK if healthy -- defaults to "/"
 	WatchedFiles        WatchedFiles
 	IgnorePatterns      IgnorePatterns
 	ServerOnly          bool
-}
-
-const OnChangeStrategyPre = "pre"
-const OnChangeStrategyPost = "post"
-const OnChangeStrategyConcurrent = "concurrent"
-const OnChangeStrategyConcurrentNoWait = "concurrent-no-wait"
-
-type OnChangeFunc func(string) error
-
-type OnChange struct {
-	Strategy         string
-	Func             OnChangeFunc
-	ExcludedPatterns []string // Glob patterns (set relative to Config.RootDir)
 }
 
 type WatchedFile struct {
@@ -121,4 +86,17 @@ type WatchedFile struct {
 	TreatAsNonGo bool
 }
 
+type OnChangeFunc func(string) error
+
+type OnChange struct {
+	Strategy         string
+	Func             OnChangeFunc
+	ExcludedPatterns []string // Glob patterns (set relative to Config.RootDir)
+}
+
 type WatchedFiles []WatchedFile
+
+type IgnorePatterns struct {
+	Dirs  []string // Glob patterns
+	Files []string // Glob patterns
+}
