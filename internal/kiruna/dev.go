@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,10 +17,48 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+// Debouncer to handle event batching
+type Debouncer struct {
+	mu       sync.Mutex
+	timer    *time.Timer
+	events   []fsnotify.Event
+	duration time.Duration
+	callback func(events []fsnotify.Event)
+}
+
+func NewDebouncer(duration time.Duration, callback func(events []fsnotify.Event)) *Debouncer {
+	return &Debouncer{
+		duration: duration,
+		callback: callback,
+	}
+}
+
+func (d *Debouncer) AddEvent(event fsnotify.Event) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.events = append(d.events, event)
+
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+
+	d.timer = time.AfterFunc(d.duration, func() {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+
+		if len(d.events) > 0 {
+			d.callback(d.events)
+			d.events = nil
+		}
+	})
+}
+
 var (
 	naiveIgnoreDirPatterns = [4]string{"**/.git", "**/node_modules", "dist/bin", distKirunaDir}
 	ignoredDirPatterns     = []string{}
 	ignoredFilePatterns    = []string{}
+	defaultWatchedFile     = WatchedFile{}
 	defaultWatchedFiles    = []WatchedFile{}
 )
 
@@ -45,6 +82,12 @@ func (c *Config) MustStartDev() {
 	}
 
 	KirunaEnv.setModeToDev()
+
+	c.killPriorPID()
+
+	// take a breather for prior process to clean up
+	// not sure why needed, but it allows same port to be used
+	time.Sleep(10 * time.Millisecond)
 
 	// Warm port right away, in case default is unavailable
 	// Also, env needs to be set in this scope
@@ -215,9 +258,15 @@ func (manager *ClientManager) start() {
 	}
 }
 
-var lastBuildCmd *exec.Cmd // __TODO sync
+var (
+	lastBuildCmd  *exec.Cmd
+	buildCmdMutex sync.Mutex
+)
 
 func (c *Config) mustKillAppDev() {
+	buildCmdMutex.Lock()
+	defer buildCmdMutex.Unlock()
+
 	if lastBuildCmd != nil {
 		if err := lastBuildCmd.Process.Kill(); err != nil {
 			errMsg := fmt.Sprintf(
@@ -227,6 +276,14 @@ func (c *Config) mustKillAppDev() {
 			)
 			c.Logger.Error(errMsg)
 			panic(errMsg)
+		} else {
+			c.Logger.Infof("killed app with pid %d", lastBuildCmd.Process.Pid)
+
+			if err := c.deletePIDFile(); err != nil {
+				c.Logger.Errorf("error: failed to delete PID file: %v", err)
+			}
+
+			lastBuildCmd = nil
 		}
 	}
 }
@@ -250,6 +307,9 @@ func (c *Config) addDirs(watcher *fsnotify.Watcher, path string) error {
 }
 
 func (c *Config) mustStartAppDev() {
+	buildCmdMutex.Lock()
+	defer buildCmdMutex.Unlock()
+
 	buildDest := filepath.Join(c.getCleanRootDir(), "dist/bin/main")
 	lastBuildCmd = exec.Command(buildDest)
 	lastBuildCmd.Stdout = os.Stdout
@@ -260,38 +320,115 @@ func (c *Config) mustStartAppDev() {
 		panic(errMsg)
 	}
 	c.Logger.Infof("app started with pid %d", lastBuildCmd.Process.Pid)
+	if err := c.writePIDFile(lastBuildCmd.Process.Pid); err != nil {
+		c.Logger.Errorf("error: failed to write PID file: %v", err)
+	}
 }
 
 func (c *Config) mustHandleWatcherEmissions(manager *ClientManager, watcher *fsnotify.Watcher) {
+	debouncer := NewDebouncer(30*time.Millisecond, func(events []fsnotify.Event) {
+		c.processBatchedEvents(manager, watcher, events)
+	})
+
 	for {
 		select {
 		case evt := <-watcher.Events:
-			time.Sleep(10 * time.Millisecond) // let the file system settle
-
-			fileInfo, _ := os.Stat(evt.Name) // no need to check error, because we want to process either way
-			if fileInfo != nil && fileInfo.IsDir() {
-				if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
-					if err := c.addDirs(watcher, evt.Name); err != nil {
-						c.Logger.Errorf("error: failed to add directory to watcher: %v", err)
-						continue
-					}
-				}
-				continue
-			}
-
-			evtDetails := c.getEvtDetails(evt)
-			if evtDetails.isIgnored {
-				continue
-			}
-
-			err := c.mustHandleFileChange(manager, evt, evtDetails)
-			if err != nil {
-				c.Logger.Errorf("error: failed to handle file change: %v", err)
-			}
-
+			debouncer.AddEvent(evt)
 		case err := <-watcher.Errors:
 			c.Logger.Errorf("watcher error: %v", err)
 		}
+	}
+}
+
+func (c *Config) processBatchedEvents(manager *ClientManager, watcher *fsnotify.Watcher, events []fsnotify.Event) {
+	fileChanges := make(map[string]fsnotify.Event)
+	for _, evt := range events {
+		fileChanges[evt.Name] = evt
+	}
+
+	relevantFileChanges := make(map[string]*EvtDetails)
+
+	wfcsAlreadyHandled := make(map[string]bool)
+	isGoOrNeedsHardReloadEvenIfNonGo := false
+
+	for _, evt := range fileChanges {
+		fileInfo, _ := os.Stat(evt.Name) // no need to check error, because we want to process either way
+		if fileInfo != nil && fileInfo.IsDir() {
+			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
+				if err := c.addDirs(watcher, evt.Name); err != nil {
+					c.Logger.Errorf("error: failed to add directory to watcher: %v", err)
+					continue
+				}
+			}
+			continue
+		}
+
+		evtDetails := c.getEvtDetails(evt)
+		if evtDetails.isIgnored {
+			continue
+		}
+
+		wfc := evtDetails.wfc
+		if wfc == nil {
+			wfc = &defaultWatchedFile
+		}
+
+		if _, alreadyHandled := wfcsAlreadyHandled[wfc.Pattern]; alreadyHandled {
+			continue
+		}
+
+		wfcsAlreadyHandled[wfc.Pattern] = true
+
+		if !isGoOrNeedsHardReloadEvenIfNonGo {
+			isGoOrNeedsHardReloadEvenIfNonGo = evtDetails.isGo
+		}
+		if !isGoOrNeedsHardReloadEvenIfNonGo {
+			isGoOrNeedsHardReloadEvenIfNonGo = wfc.RecompileBinary || wfc.RestartApp
+		}
+
+		relevantFileChanges[evt.Name] = evtDetails
+	}
+
+	if len(relevantFileChanges) == 0 {
+		return
+	}
+
+	hasMultipleEvents := len(relevantFileChanges) > 1
+
+	if !hasMultipleEvents {
+		var evtName string
+		for evtName = range relevantFileChanges {
+			break
+		}
+		if relevantFileChanges[evtName].isNonEmptyCHMODOnly {
+			return
+		}
+	}
+
+	if hasMultipleEvents {
+		manager.broadcast <- RefreshFilePayload{
+			ChangeType: ChangeTypeRebuilding,
+		}
+	}
+
+	for _, evtDetails := range relevantFileChanges {
+		err := c.mustHandleFileChange(manager, evtDetails, hasMultipleEvents)
+		if err != nil {
+			c.Logger.Errorf("error: failed to handle file change: %v", err)
+		}
+	}
+
+	if hasMultipleEvents {
+		if isGoOrNeedsHardReloadEvenIfNonGo {
+			c.mustKillAndRestart()
+			return
+		}
+		c.mustReloadBroadcast(
+			manager,
+			RefreshFilePayload{
+				ChangeType: ChangeTypeOther,
+			},
+		)
 	}
 }
 
@@ -304,7 +441,7 @@ func (c *Config) getIsIgnored(path string, ignoredPatterns *[]string) bool {
 	return false
 }
 
-func (c *Config) getEvtDetails(evt fsnotify.Event) EvtDetails {
+func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
 	isCssSimple := filepath.Ext(evt.Name) == ".css"
 	isCriticalCSS := isCssSimple && c.getIsCssEvtType(evt, ChangeTypeCriticalCSS)
 	isNormalCSS := isCssSimple && c.getIsCssEvtType(evt, ChangeTypeNormalCSS)
@@ -342,35 +479,34 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) EvtDetails {
 		isIgnored = true
 	}
 
-	return EvtDetails{
+	return &EvtDetails{
+		evt:                 &evt,
 		isOther:             isOther,
 		isKirunaCSS:         isKirunaCSS,
 		isGo:                isGo,
 		isIgnored:           isIgnored,
 		isCriticalCSS:       isCriticalCSS,
 		isNormalCSS:         isNormalCSS,
-		matchingWatchedFile: matchingWatchedFile,
+		wfc:                 matchingWatchedFile,
+		isNonEmptyCHMODOnly: c.getIsNonEmptyCHMODOnly(evt),
 	}
 }
 
-func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event, evtDetails EvtDetails,
+func (c *Config) mustHandleFileChange(
+	manager *ClientManager,
+	evtDetails *EvtDetails,
+	isPartOfBatch bool,
 ) error {
-	if c.getIsNonEmptyCHMODOnly(evt) {
-		return nil
-	}
-
-	wfc := evtDetails.matchingWatchedFile
+	wfc := evtDetails.wfc
 	if wfc == nil {
-		wfc = &WatchedFile{}
+		wfc = &defaultWatchedFile
 	}
 
-	if !c.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS {
+	if !c.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS && !isPartOfBatch {
 		manager.broadcast <- RefreshFilePayload{
 			ChangeType: ChangeTypeRebuilding,
 		}
 	}
-
-	c.Logger.Infof("modified: %s", evt.Name)
 
 	if evtDetails.isGo || wfc.RecompileBinary {
 		c.Logger.Infof("recompiling binary")
@@ -382,10 +518,10 @@ func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event
 
 	if sortedOnChanges.exists {
 		go func() {
-			c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrentNoWait, evt.Name, false)
+			c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrentNoWait, evtDetails.evt.Name, false)
 		}()
 
-		c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPre, evt.Name)
+		c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPre, evtDetails.evt.Name)
 
 		if wfc.RunOnChangeOnly {
 			c.Logger.Infof("ran applicable onChange callbacks")
@@ -399,7 +535,7 @@ func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event
 			buildErr = c.callback(wfc, evtDetails)
 		}()
 
-		c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrent, evt.Name, true)
+		c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrent, evtDetails.evt.Name, true)
 		wg.Wait()
 	} else {
 		buildErr = c.callback(wfc, evtDetails)
@@ -410,15 +546,15 @@ func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event
 		return buildErr
 	}
 
-	c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPost, evt.Name)
+	c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPost, evtDetails.evt.Name)
 
 	needsHardReloadEvenIfNonGo := wfc.RecompileBinary || wfc.RestartApp
 
-	if evtDetails.isGo || needsHardReloadEvenIfNonGo {
+	if (evtDetails.isGo || needsHardReloadEvenIfNonGo) && !isPartOfBatch {
 		c.mustKillAndRestart()
 	}
 
-	if c.DevConfig.ServerOnly {
+	if c.DevConfig.ServerOnly || isPartOfBatch {
 		return nil
 	}
 
@@ -432,7 +568,6 @@ func (c *Config) mustHandleFileChange(manager *ClientManager, evt fsnotify.Event
 		)
 		return nil
 	}
-
 	// At this point, we know it's a CSS file
 
 	cssType := ChangeTypeNormalCSS
@@ -475,13 +610,15 @@ func (c *Config) getIsMatch(pattern string, path string) bool {
 }
 
 type EvtDetails struct {
+	evt                 *fsnotify.Event
 	isIgnored           bool
 	isGo                bool
 	isOther             bool
 	isCriticalCSS       bool
 	isNormalCSS         bool
 	isKirunaCSS         bool
-	matchingWatchedFile *WatchedFile
+	wfc                 *WatchedFile
+	isNonEmptyCHMODOnly bool
 }
 
 func (c *Config) getIsCssEvtType(evt fsnotify.Event, cssType ChangeType) bool {
@@ -493,7 +630,7 @@ func (c *Config) getIsNonEmptyCHMODOnly(evt fsnotify.Event) bool {
 	return isSolelyCHMOD && !c.getIsEmptyFile(evt)
 }
 
-func (c *Config) callback(wfc *WatchedFile, evtDetails EvtDetails) error {
+func (c *Config) callback(wfc *WatchedFile, evtDetails *EvtDetails) error {
 	if evtDetails.isGo {
 		return c.compileBinary()
 	}
@@ -528,8 +665,6 @@ func (c *Config) mustReloadBroadcast(manager *ClientManager, rfp RefreshFilePayl
 	panic(errMsg)
 }
 
-var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
-
 func (c *Config) getIsEmptyFile(evt fsnotify.Event) bool {
 	file, err := os.Open(evt.Name)
 	if err != nil {
@@ -559,8 +694,13 @@ func (c *Config) runOtherFileBuild(wfc *WatchedFile) error {
 	return nil
 }
 
+const (
+	maxReadinessAttempts = 100
+	baseReadinessDelay   = 20 * time.Millisecond
+)
+
 func (c *Config) waitForAppReadiness() bool {
-	for attempts := 0; attempts < 100; attempts++ {
+	for attempts := 0; attempts < maxReadinessAttempts; attempts++ {
 		url := fmt.Sprintf(
 			"http://localhost:%d%s",
 			MustGetPort(),
@@ -572,8 +712,8 @@ func (c *Config) waitForAppReadiness() bool {
 			return true
 		}
 
-		additionalDelay := time.Duration(attempts * 20)
-		time.Sleep(20*time.Millisecond + additionalDelay*time.Millisecond)
+		additionalDelay := time.Duration(attempts) * baseReadinessDelay
+		time.Sleep(baseReadinessDelay + additionalDelay)
 	}
 	return false
 }
