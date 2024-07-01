@@ -352,7 +352,7 @@ func (c *Config) processBatchedEvents(manager *ClientManager, watcher *fsnotify.
 	isGoOrNeedsHardReloadEvenIfNonGo := false
 
 	for _, evt := range fileChanges {
-		fileInfo, _ := os.Stat(evt.Name)
+		fileInfo, _ := os.Stat(evt.Name) // no need to check error, because we want to process either way
 		if fileInfo != nil && fileInfo.IsDir() {
 			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
 				if err := c.addDirs(watcher, evt.Name); err != nil {
@@ -406,8 +406,6 @@ func (c *Config) processBatchedEvents(manager *ClientManager, watcher *fsnotify.
 	}
 
 	if hasMultipleEvents {
-		c.Logger.Infof("%d file changes detected", len(relevantFileChanges))
-
 		manager.broadcast <- RefreshFilePayload{
 			ChangeType: ChangeTypeRebuilding,
 		}
