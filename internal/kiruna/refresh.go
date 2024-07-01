@@ -6,6 +6,76 @@ import (
 	"time"
 )
 
+// clientManager manages all SSE clients
+type clientManager struct {
+	clients    map[*client]bool
+	register   chan *client
+	unregister chan *client
+	broadcast  chan refreshFilePayload
+}
+
+// Client represents a single SSE connection
+type client struct {
+	id     string
+	notify chan<- refreshFilePayload
+}
+
+type Base64 = string
+
+type refreshFilePayload struct {
+	ChangeType   changeType `json:"changeType"`
+	CriticalCSS  Base64     `json:"criticalCSS"`
+	NormalCSSURL string     `json:"normalCSSURL"`
+	At           time.Time  `json:"at"`
+}
+
+type changeType string
+
+const (
+	changeTypeNormalCSS   changeType = "normal"
+	changeTypeCriticalCSS changeType = "critical"
+	changeTypeOther       changeType = "other"
+	changeTypeRebuilding  changeType = "rebuilding"
+)
+
+func newClientManager() *clientManager {
+	return &clientManager{
+		clients:    make(map[*client]bool),
+		register:   make(chan *client),
+		unregister: make(chan *client),
+		broadcast:  make(chan refreshFilePayload),
+	}
+}
+
+// Start the manager to handle clients and broadcasting
+func (manager *clientManager) start() {
+	for {
+		select {
+		case client := <-manager.register:
+			manager.clients[client] = true
+		case client := <-manager.unregister:
+			if _, ok := manager.clients[client]; ok {
+				delete(manager.clients, client)
+				close(client.notify)
+			}
+		case msg := <-manager.broadcast:
+			for client := range manager.clients {
+				client.notify <- msg
+			}
+		}
+	}
+}
+
+func (c *Config) mustReloadBroadcast(rfp refreshFilePayload) {
+	if c.waitForAppReadiness() {
+		c.manager.broadcast <- rfp
+		return
+	}
+	errMsg := fmt.Sprintf("error: app never became ready: %v", rfp.ChangeType)
+	c.Logger.Error(errMsg)
+	panic(errMsg)
+}
+
 func GetRefreshScript(config *Config) string {
 	if !KirunaEnv.GetIsDev() {
 		return ""
@@ -39,7 +109,7 @@ if (scrollY) {
 const es = new EventSource("http://localhost:%d/events");
 
 es.onmessage = (e) => {
-	const { changeType, criticalCss, normalCssUrl, at } = JSON.parse(e.data);
+	const { changeType, criticalCSS, normalCSSURL, at } = JSON.parse(e.data);
 	if (changeType == "rebuilding") {
 		console.log("Rebuilding server...");
 		const el = document.createElement("div");
@@ -77,7 +147,7 @@ es.onmessage = (e) => {
 		const newLink = document.createElement("link");
 		newLink.id = "__normal-css";
 		newLink.rel = "stylesheet";
-		newLink.href = normalCssUrl;
+		newLink.href = normalCSSURL;
 		newLink.onload = () => oldLink.remove();
 		oldLink.parentNode.insertBefore(newLink, oldLink.nextSibling);
 	}
@@ -85,7 +155,7 @@ es.onmessage = (e) => {
 		const oldStyle = document.getElementById("__critical-css");
 		const newStyle = document.createElement("style");
 		newStyle.id = "__critical-css";
-		newStyle.innerHTML = base64ToUTF8(criticalCss);
+		newStyle.innerHTML = base64ToUTF8(criticalCSS);
 		document.head.replaceChild(newStyle, oldStyle);
 	}
 };
@@ -101,14 +171,14 @@ window.addEventListener("beforeunload", () => {
 });
 `
 
-func sseHandler(manager *ClientManager) http.HandlerFunc {
+func sseHandler(manager *clientManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
-		msg := make(chan RefreshFilePayload, 1)
-		client := &Client{id: r.RemoteAddr, notify: msg}
+		msg := make(chan refreshFilePayload, 1)
+		client := &client{id: r.RemoteAddr, notify: msg}
 		manager.register <- client
 
 		defer func() {
@@ -125,7 +195,7 @@ func sseHandler(manager *ClientManager) http.HandlerFunc {
 			case m := <-msg:
 				// encode as json
 				json := fmt.Sprintf(
-					`{"changeType": "%s", "criticalCss": "%s", "normalCssUrl": "%s", "at": "%s"}`,
+					`{"changeType": "%s", "criticalCSS": "%s", "normalCSSURL": "%s", "at": "%s"}`,
 					m.ChangeType,
 					m.CriticalCSS,
 					m.NormalCSSURL,

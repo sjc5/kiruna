@@ -1,31 +1,47 @@
 package ik
 
 import (
-	"crypto/sha256"
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/sjc5/kit/pkg/fsutil"
+	"golang.org/x/sync/semaphore"
 )
 
-func (c *Config) compileBinary() error {
-	cleanRootDir := c.getCleanRootDir()
-	buildDest := filepath.Join(cleanRootDir, "dist/bin/main")
-	entryPoint := filepath.Join(cleanRootDir, c.EntryPoint)
-	buildCmd := exec.Command("go", "build", "-o", buildDest, entryPoint)
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-	err := buildCmd.Run()
-	if err != nil {
-		return fmt.Errorf("error compiling binary: %v", err)
-	}
-	c.Logger.Infof("compilation complete: %s", buildDest)
-	return nil
+var fileSemaphore = semaphore.NewWeighted(100)
+
+type syncMap struct {
+	sync.RWMutex
+	m map[string]string
+}
+
+func (sm *syncMap) Store(key, value string) {
+	sm.Lock()
+	defer sm.Unlock()
+	sm.m[key] = value
+}
+
+func (sm *syncMap) Load(key string) (string, bool) {
+	sm.RLock()
+	defer sm.RUnlock()
+	v, ok := sm.m[key]
+	return v, ok
+}
+
+type precompileError struct {
+	task string
+	err  error
+}
+
+func (e precompileError) Error() string {
+	return fmt.Sprintf("error during precompile task %s: %v", e.task, e.err)
 }
 
 func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
@@ -41,35 +57,32 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 		}
 
 		// nuke the dist/kiruna directory
-		err = os.RemoveAll(filepath.Join(cleanRootDir, distKirunaDir))
-		if err != nil {
+		if err := os.RemoveAll(filepath.Join(cleanRootDir, distKirunaDir)); err != nil {
 			return fmt.Errorf("error removing dist/kiruna directory: %v", err)
 		}
 
 		// re-make required directories
 		isServerOnly := c.DevConfig != nil && c.DevConfig.ServerOnly
 		if !isServerOnly {
-			err = SetupDistDir(c.RootDir)
-			if err != nil {
+			if err := SetupDistDir(c.RootDir); err != nil {
 				return fmt.Errorf("error making requisite directories: %v", err)
 			}
 		}
 
 		// add pid file back
 		if lastPID != 0 {
-			err = pidFile.writePIDFile(lastPID)
-			if err != nil {
+			if err := pidFile.writePIDFile(lastPID); err != nil {
 				return fmt.Errorf("error writing PID file: %v", err)
 			}
 		}
 	}
 
 	// Must be complete before BuildCSS in case the CSS references any public files
-	err := c.handlePublicFiles(shouldBeGranular)
-	if err != nil {
+	if err := c.handlePublicFiles(shouldBeGranular); err != nil {
 		return fmt.Errorf("error handling public files: %v", err)
 	}
 
+	// Concurrently execute tasks
 	var wg sync.WaitGroup
 	errChan := make(chan error, 2) // Buffer to hold up to 2 errors
 	wg.Add(2)                      // Two tasks to do concurrently
@@ -77,7 +90,7 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	// goroutine 1
 	go func() {
 		defer wg.Done()
-		if err = c.copyPrivateFiles(shouldBeGranular); err != nil {
+		if err := c.copyPrivateFiles(shouldBeGranular); err != nil {
 			errChan <- precompileError{task: "copyPrivateFiles", err: err}
 		}
 	}()
@@ -85,7 +98,7 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	// goroutine 2
 	go func() {
 		defer wg.Done()
-		if err = c.BuildCSS(); err != nil {
+		if err := c.buildCSS(); err != nil {
 			errChan <- precompileError{task: "BuildCSS", err: err}
 		}
 	}()
@@ -94,29 +107,32 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	wg.Wait()
 	close(errChan)
 
-	// Check for errors
+	var combinedErrors []error
 	for e := range errChan {
 		if e != nil {
-			return e
+			combinedErrors = append(combinedErrors, e)
 		}
 	}
 
+	if len(combinedErrors) > 0 {
+		return fmt.Errorf("multiple errors: %v", combinedErrors)
+	}
+
 	if recompileBinary {
-		err = c.compileBinary()
-		if err != nil {
+		if err := c.compileBinary(); err != nil {
 			return fmt.Errorf("error compiling binary: %v", err)
 		}
 	}
 	return nil
 }
 
-func (c *Config) BuildCSS() error {
-	err := c.ProcessCSS("critical")
+func (c *Config) buildCSS() error {
+	err := c.processCSS("critical")
 	if err != nil {
 		return fmt.Errorf("error processing critical CSS: %v", err)
 	}
 
-	err = c.ProcessCSS("normal")
+	err = c.processCSS("normal")
 	if err != nil {
 		return fmt.Errorf("error processing normal CSS: %v", err)
 	}
@@ -126,8 +142,25 @@ func (c *Config) BuildCSS() error {
 
 var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
 
+type syncString struct {
+	sync.RWMutex
+	builder strings.Builder
+}
+
+func (s *syncString) append(str string) {
+	s.Lock()
+	defer s.Unlock()
+	s.builder.WriteString(str)
+}
+
+func (s *syncString) string() string {
+	s.RLock()
+	defer s.RUnlock()
+	return s.builder.String()
+}
+
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
-func (c *Config) ProcessCSS(subDir string) error {
+func (c *Config) processCSS(subDir string) error {
 	cleanRootDir := c.getCleanRootDir()
 
 	dirPath := filepath.Join(cleanRootDir, "styles", subDir)
@@ -139,10 +172,7 @@ func (c *Config) ProcessCSS(subDir string) error {
 		return fmt.Errorf("error reading directory: %v", err)
 	}
 
-	var (
-		concatenatedCSS strings.Builder
-		fileNames       []string
-	)
+	var fileNames []string
 
 	// Collect and sort .css files
 	for _, file := range files {
@@ -152,16 +182,31 @@ func (c *Config) ProcessCSS(subDir string) error {
 	}
 	sort.Strings(fileNames)
 
-	// Concatenate file contents
+	var concatenatedCSS syncString
+	var wg sync.WaitGroup
+
 	for _, fileName := range fileNames {
-		content, err := os.ReadFile(filepath.Join(dirPath, fileName))
-		if err != nil {
-			return fmt.Errorf("error reading file: %v", err)
-		}
-		concatenatedCSS.Write(content)
+		wg.Add(1)
+		go func(fn string) {
+			defer wg.Done()
+			if err := fileSemaphore.Acquire(context.Background(), 1); err != nil {
+				c.Logger.Errorf("Error acquiring semaphore: %v", err)
+				return
+			}
+			defer fileSemaphore.Release(1)
+
+			content, err := os.ReadFile(filepath.Join(dirPath, fn))
+			if err != nil {
+				c.Logger.Errorf("Error reading file %s: %v", fn, err)
+				return
+			}
+			concatenatedCSS.append(string(content))
+		}(fileName)
 	}
 
-	concatenatedCSSString := concatenatedCSS.String()
+	wg.Wait()
+
+	concatenatedCSSString := concatenatedCSS.string()
 	concatenatedCSSString = urlRegex.ReplaceAllStringFunc(concatenatedCSSString, func(match string) string {
 		rawUrl := urlRegex.FindStringSubmatch(match)[1]
 		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
@@ -199,10 +244,7 @@ func (c *Config) ProcessCSS(subDir string) error {
 		}
 
 		// Hash the concatenated content
-		outputFileName = getHashedFilename(
-			[]byte(concatenatedCSS.String()),
-			"normal.css",
-		)
+		outputFileName = getHashedFilenameFromBytes([]byte(concatenatedCSS.string()), "normal.css")
 	}
 
 	// Ensure output directory exists
@@ -222,7 +264,7 @@ func (c *Config) ProcessCSS(subDir string) error {
 	}
 
 	if subDir == "critical" {
-		concatenatedCSSString = naiveCSSMinify(concatenatedCSS.String())
+		concatenatedCSSString = naiveCSSMinify(concatenatedCSS.string())
 	}
 
 	return os.WriteFile(outputFile, []byte(concatenatedCSSString), 0644)
@@ -260,6 +302,12 @@ func (c *Config) copyPrivateFiles(shouldBeGranular bool) error {
 	})
 }
 
+type fileInfo struct {
+	path         string
+	relativePath string
+	isNoHashDir  bool
+}
+
 func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	cleanRootDir := c.getCleanRootDir()
 	srcDir := filepath.Join(cleanRootDir, staticDir, opts.dirName)
@@ -269,113 +317,90 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		return nil
 	}
 
-	newFileMap := make(map[string]string)
-	oldFileMap := make(map[string]string)
+	newFileMap := &syncMap{m: make(map[string]string)}
+	oldFileMap := &syncMap{m: make(map[string]string)}
 
 	// Load old file map if granular updates are enabled
 	if opts.shouldBeGranular {
 		var err error
-		oldFileMap, err = c.LoadMapFromGob(opts.mapName, true)
+		oldMap, err := c.loadMapFromGob(opts.mapName, true)
 		if err != nil {
 			return fmt.Errorf("error reading old file map: %v", err)
 		}
+		for k, v := range oldMap {
+			oldFileMap.Store(k, v)
+		}
 	}
 
-	// Walk the directory and process files
-	err := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("error walking dir: %v", err)
-		}
-		if d.IsDir() {
+	fileChan := make(chan fileInfo, 100)
+	errChan := make(chan error, 1)
+	var wg sync.WaitGroup
+
+	// File discovery goroutine
+	go func() {
+		defer close(fileChan)
+		err := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() {
+				relativePath, err := filepath.Rel(srcDir, path)
+				if err != nil {
+					return err
+				}
+				relativePath = filepath.ToSlash(relativePath)
+				isNoHashDir := opts.getIsNoHashDir(relativePath)
+				if isNoHashDir {
+					relativePath = strings.TrimPrefix(relativePath, "__nohash/")
+				}
+				fileChan <- fileInfo{path: path, relativePath: relativePath, isNoHashDir: isNoHashDir}
+			}
 			return nil
-		}
-
-		relativePath, err := filepath.Rel(srcDir, path)
+		})
 		if err != nil {
-			return fmt.Errorf("error getting relative path: %v", err)
+			errChan <- err
 		}
+	}()
 
-		// Normalize path
-		relativePath = filepath.ToSlash(relativePath)
-		isNoHashDir := opts.getIsNoHashDir(relativePath)
-		if isNoHashDir {
-			relativePath = strings.TrimPrefix(relativePath, "__nohash/")
-		}
-		relativePathUnderscores := strings.ReplaceAll(relativePath, "/", "_")
-
-		var contentBytes []byte
-		hasSetContentBytes := false
-
-		var fileIdentifier string
-		if isNoHashDir {
-			fileIdentifier = relativePath
-		} else {
-			contentBytes, err = os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("error reading file: %v", err)
+	// File processing goroutines
+	workerCount := 4
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for fi := range fileChan {
+				if err := c.processFile(fi, opts, newFileMap, oldFileMap, distDir); err != nil {
+					errChan <- err
+					return
+				}
 			}
-			hasSetContentBytes = true
+		}()
+	}
 
-			fileIdentifier = getHashedFilename(contentBytes, relativePathUnderscores)
-		}
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
 
-		newFileMap[relativePath] = fileIdentifier
-
-		// Skip unchanged files if granular updates are enabled
-		if opts.shouldBeGranular {
-			if oldHash, exists := oldFileMap[relativePath]; exists && oldHash == fileIdentifier {
-				return nil
-			}
-		}
-
-		var distPath string
-		if opts.writeWithHash {
-			distPath = filepath.Join(distDir, fileIdentifier)
-		} else {
-			distPath = filepath.Join(distDir, relativePath)
-		}
-
-		err = os.MkdirAll(filepath.Dir(distPath), 0755)
-		if err != nil {
-			return fmt.Errorf("error creating directory: %v", err)
-		}
-
-		if !hasSetContentBytes {
-			contentBytes, err = os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("error reading file: %v", err)
-			}
-			hasSetContentBytes = true // not strictly needed, but trying to be nice to my future self
-		}
-
-		err = os.WriteFile(distPath, contentBytes, 0644)
-		if err != nil {
-			return fmt.Errorf("error writing file: %v", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("error walking dir: %v", err)
+	if err := <-errChan; err != nil {
+		return err
 	}
 
 	// Cleanup old moot files if granular updates are enabled
 	if opts.shouldBeGranular {
-		for relativePath, oldHash := range oldFileMap {
-			newHash := newFileMap[relativePath]
-
-			if oldHash != newHash {
-				oldDistPath := filepath.Join(distDir, oldHash)
+		for k, v := range oldFileMap.m {
+			if newHash, exists := newFileMap.Load(k); !exists || newHash != v {
+				oldDistPath := filepath.Join(distDir, v)
 				err := os.Remove(oldDistPath)
 				if err != nil && !os.IsNotExist(err) {
-					return fmt.Errorf("error removing old static file from dist (%s/%s): %v", opts.dirName, oldHash, err)
+					return fmt.Errorf("error removing old static file from dist (%s/%s): %v", opts.dirName, v, err)
 				}
 			}
 		}
 	}
 
 	// Save the updated file map
-	err = saveMapToGob(cleanRootDir, newFileMap, opts.mapName)
+	err := c.saveMapToGob(newFileMap.m, opts.mapName)
 	if err != nil {
 		return fmt.Errorf("error saving file map: %v", err)
 	}
@@ -383,51 +408,50 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	return nil
 }
 
-func getHashedFilename(content []byte, originalFileName string) string {
-	hash := sha256.New()
-	hash.Write(content)
-	hashedSuffix := fmt.Sprintf("%x", hash.Sum(nil))[:12] // Short hash
-	ext := filepath.Ext(originalFileName)
-	outputFileName := fmt.Sprintf("%s_%s%s", strings.TrimSuffix(originalFileName, ext), hashedSuffix, ext)
-	return outputFileName
-}
+func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFileMap, oldFileMap *syncMap, distDir string) error {
+	if err := fileSemaphore.Acquire(context.Background(), 1); err != nil {
+		return fmt.Errorf("error acquiring semaphore: %v", err)
+	}
+	defer fileSemaphore.Release(1)
 
-func SetupDistDir(rootDir string) error {
-	cleanRootDir := filepath.Clean(rootDir)
+	relativePathUnderscores := strings.ReplaceAll(fi.relativePath, "/", "_")
 
-	// make a dist/kiruna/internal directory
-	path := filepath.Join(cleanRootDir, distKirunaDir, internalDir)
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return fmt.Errorf("error making internal directory: %v", err)
+	var fileIdentifier string
+	if fi.isNoHashDir {
+		fileIdentifier = fi.relativePath
+	} else {
+		var err error
+		fileIdentifier, err = getHashedFilenameFromPath(fi.path, relativePathUnderscores)
+		if err != nil {
+			return fmt.Errorf("error getting hashed filename: %v", err)
+		}
 	}
 
-	// add a x file so that go:embed doesn't complain
-	path = filepath.Join(cleanRootDir, distKirunaDir, "x")
-	if err := os.WriteFile(path, []byte(""), 0644); err != nil {
-		return fmt.Errorf("error making x file: %v", err)
+	newFileMap.Store(fi.relativePath, fileIdentifier)
+
+	// Skip unchanged files if granular updates are enabled
+	if opts.shouldBeGranular {
+		if oldHash, exists := oldFileMap.Load(fi.relativePath); exists && oldHash == fileIdentifier {
+			return nil
+		}
 	}
 
-	// need an empty dist/kiruna/public directory
-	path = filepath.Join(cleanRootDir, distKirunaDir, staticDir, publicDir)
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return fmt.Errorf("error making public directory: %v", err)
+	var distPath string
+	if opts.writeWithHash {
+		distPath = filepath.Join(distDir, fileIdentifier)
+	} else {
+		distPath = filepath.Join(distDir, fi.relativePath)
 	}
 
-	// need an empty dist/kiruna/private directory
-	path = filepath.Join(cleanRootDir, distKirunaDir, staticDir, privateDir)
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return fmt.Errorf("error making private directory: %v", err)
+	err := os.MkdirAll(filepath.Dir(distPath), 0755)
+	if err != nil {
+		return fmt.Errorf("error creating directory: %v", err)
+	}
+
+	err = fsutil.CopyFile(fi.path, distPath)
+	if err != nil {
+		return fmt.Errorf("error copying file: %v", err)
 	}
 
 	return nil
-}
-
-// Define a custom error type for more specific error handling
-type precompileError struct {
-	task string
-	err  error
-}
-
-func (e precompileError) Error() string {
-	return fmt.Sprintf("error during precompile task %s: %v", e.task, e.err)
 }

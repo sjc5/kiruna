@@ -14,11 +14,11 @@ const (
 	PrivateFileMapGobName = "private_filemap.gob"
 )
 
-func (c *Config) LoadMapFromGob(gobFileName string, useDirFS bool) (map[string]string, error) {
+func (c *Config) loadMapFromGob(gobFileName string, useDirFS bool) (map[string]string, error) {
 	var FS UniversalFS
 	var err error
 	if useDirFS {
-		FS = c.GetUniversalDirFS()
+		FS = c.getUniversalDirFS()
 	} else {
 		FS, err = c.GetUniversalFS()
 	}
@@ -42,8 +42,8 @@ func (c *Config) LoadMapFromGob(gobFileName string, useDirFS bool) (map[string]s
 	return mapFromGob, nil
 }
 
-func saveMapToGob(cleanRootDir string, mapToSave map[string]string, dest string) error {
-	file, err := os.Create(filepath.Join(cleanRootDir, distKirunaDir, internalDir, dest))
+func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
+	file, err := os.Create(filepath.Join(c.getCleanRootDir(), distKirunaDir, internalDir, dest))
 	if err != nil {
 		return fmt.Errorf("error creating file: %v", err)
 	}

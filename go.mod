@@ -6,6 +6,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/sjc5/kit v0.0.25
+	golang.org/x/sync v0.7.0
 )
 
 require golang.org/x/sys v0.17.0 // indirect

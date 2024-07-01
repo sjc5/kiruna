@@ -3,6 +3,7 @@ package ik
 import (
 	"io/fs"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/sjc5/kit/pkg/colorlog"
 )
 
@@ -39,6 +40,9 @@ type Config struct {
 	DevConfig *DevConfig
 
 	Logger Logger
+
+	watcher *fsnotify.Watcher
+	manager *clientManager
 }
 
 type DevConfig struct {

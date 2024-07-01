@@ -48,11 +48,11 @@ func newUniversalFS(fs fs.FS) UniversalFS {
 	return &universalFS{FS: fs}
 }
 
-func (c *Config) GetIsUsingEmbeddedFS() bool {
+func (c *Config) getIsUsingEmbeddedFS() bool {
 	return c.DistFS != nil
 }
 
-func (c *Config) GetUniversalDirFS() UniversalFS {
+func (c *Config) getUniversalDirFS() UniversalFS {
 	if hit, isCached := cache.uniDirFS.Load(c); isCached {
 		return hit
 	}
@@ -114,7 +114,7 @@ func (c *Config) GetUniversalFS() (UniversalFS, error) {
 
 	// PROD
 	// If we are using the embedded file system, we should use the dist file system
-	if c.GetIsUsingEmbeddedFS() {
+	if c.getIsUsingEmbeddedFS() {
 		c.Logger.Infof("using embedded file system (production)")
 
 		// Assuming the embed directive looks like this:

@@ -35,7 +35,7 @@ func (c *Config) GetPublicURL(originalPublicURL string, useDirFS bool) string {
 	var fileMapFromGob map[string]string
 	once.Do(func() {
 		var err error
-		fileMapFromGob, err = c.LoadMapFromGob(PublicFileMapGobName, useDirFS)
+		fileMapFromGob, err = c.loadMapFromGob(PublicFileMapGobName, useDirFS)
 		if err != nil {
 			c.Logger.Errorf("error loading file map from gob: %v", err)
 			return
