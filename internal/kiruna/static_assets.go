@@ -67,6 +67,11 @@ func (c *Config) GetPublicURL(originalPublicURL string, useDirFS bool) string {
 }
 
 func (c *Config) MakePublicURLsMap(filepaths []string, useDirFS bool) map[string]string {
+	cacheKey := fmt.Sprintf("%p", c) + fmt.Sprintf("%t", useDirFS) + strings.Join(filepaths, "")
+	if hit, isCached := cache.publicURLsMap.Load(cacheKey); isCached {
+		return hit
+	}
+
 	filepathsMap := make(map[string]string, len(filepaths))
 	var sb strings.Builder
 	sb.Grow(64)
@@ -84,7 +89,8 @@ func (c *Config) MakePublicURLsMap(filepaths []string, useDirFS bool) map[string
 		filepathsMap[safeKey] = c.GetPublicURL(filepath, useDirFS)
 	}
 
-	return filepathsMap
+	actual, _ := cache.publicURLsMap.LoadOrStore(cacheKey, filepathsMap)
+	return actual
 }
 
 func cleanURL(url string) string {

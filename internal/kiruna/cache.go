@@ -22,6 +22,7 @@ var cache = struct {
 	fileMapFromGob   typed.SyncMap[string, map[string]string]
 	fileMapLoadOnce  typed.SyncMap[string, *sync.Once]
 	publicURLs       typed.SyncMap[string, string]
+	publicURLsMap    typed.SyncMap[string, map[string]string]
 	publicFileMapURL typed.SyncMap[*Config, string]
 
 	// Dev
