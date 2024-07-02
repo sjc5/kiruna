@@ -80,7 +80,8 @@ func (c *Config) getPublicURLGetterScript() string {
 	return fmt.Sprintf(`<script type="module">
 	window.kiruna = {}; import { kirunaPublicFileMap } from "%s";
 	function getPublicURL(originalPublicURL) { 
-		const url = kirunaPublicFileMap[originalPublicURL] || originalPublicURL;
+		let url = kirunaPublicFileMap[originalPublicURL] || originalPublicURL;
+		if (url.startsWith("/")) url = url.slice(1);
 		return "/public/" + url;
 	}
 	window.kiruna.getPublicURL = getPublicURL;
