@@ -405,6 +405,13 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		return fmt.Errorf("error saving file map: %v", err)
 	}
 
+	if opts.dirName == publicDir {
+		err = c.savePublicFileMapJSToInternalPublicDir(newFileMap.m)
+		if err != nil {
+			return fmt.Errorf("error saving public file map JSON: %v", err)
+		}
+	}
+
 	return nil
 }
 

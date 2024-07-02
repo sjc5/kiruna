@@ -19,9 +19,10 @@ var cache = struct {
 	styleSheetURL     typed.SyncMap[*Config, string]
 
 	// Public URLs
-	fileMapFromGob  typed.SyncMap[string, map[string]string]
-	fileMapLoadOnce typed.SyncMap[string, *sync.Once]
-	publicURLs      typed.SyncMap[string, string]
+	fileMapFromGob   typed.SyncMap[string, map[string]string]
+	fileMapLoadOnce  typed.SyncMap[string, *sync.Once]
+	publicURLs       typed.SyncMap[string, string]
+	publicFileMapURL typed.SyncMap[*Config, string]
 
 	// Dev
 	matchResults typed.SyncMap[string, bool]

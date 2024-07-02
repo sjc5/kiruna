@@ -2,6 +2,7 @@ package ik
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 )
 
 const (
+	PublicFileMapJSName   = "public_filemap.js"
 	PublicFileMapGobName  = "public_filemap.gob"
 	PrivateFileMapGobName = "private_filemap.gob"
 )
@@ -50,4 +52,61 @@ func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
 	defer file.Close()
 	encoder := gob.NewEncoder(file)
 	return encoder.Encode(mapToSave)
+}
+
+func (c *Config) savePublicFileMapJSToInternalPublicDir(mapToSave map[string]string) error {
+	mapAsJSON, err := json.Marshal(mapToSave)
+	if err != nil {
+		return fmt.Errorf("error marshalling map to JSON: %v", err)
+	}
+
+	bytes := []byte(fmt.Sprintf("export const kirunaPublicFileMap = %s;", string(mapAsJSON)))
+
+	hashedFilename := getHashedFilenameFromBytes(bytes, PublicFileMapJSName)
+
+	hashedFileRefPath := filepath.Join(c.getCleanRootDir(), distKirunaDir, internalDir, publicFileMapFileRefFile)
+	if err := os.WriteFile(hashedFileRefPath, []byte(hashedFilename), 0644); err != nil {
+		return fmt.Errorf("error writing to file: %v", err)
+	}
+
+	return os.WriteFile(filepath.Join(c.getCleanRootDir(), distKirunaDir, staticDir, publicDir, publicInternalDir, hashedFilename), bytes, 0644)
+}
+
+func (c *Config) getPreloadPublicFilemapLinkElement() string {
+	return fmt.Sprintf(`<link rel="modulepreload" href="%s">`, c.getPublicFileMapURL())
+}
+
+func (c *Config) getPublicURLGetterScript() string {
+	return fmt.Sprintf(`<script type="module">
+	window.kiruna = {}; import { kirunaPublicFileMap } from "%s";
+	function getPublicURL(originalPublicURL) { return kirunaPublicFileMap[originalPublicURL] || originalPublicURL; }
+	window.kiruna.getPublicURL = getPublicURL;
+</script>`, c.getPublicFileMapURL())
+}
+
+func (c *Config) GetPublicFileMapElements() string {
+	return c.getPreloadPublicFilemapLinkElement() + "\n" + c.getPublicURLGetterScript()
+}
+
+func (c *Config) getPublicFileMapURL() string {
+	if hit, isCached := cache.publicFileMapURL.Load(c); isCached && !KirunaEnv.GetIsDev() {
+		return hit
+	}
+
+	fs, err := c.GetUniversalFS()
+	if err != nil {
+		c.Logger.Errorf("error getting FS: %v", err)
+		return ""
+	}
+
+	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
+	content, err := fs.ReadFile(filepath.Join(internalDir, publicFileMapFileRefFile))
+	if err != nil {
+		c.Logger.Errorf("error reading publicFileMapFileRefFile: %v", err)
+		return ""
+	}
+
+	url := "/" + filepath.Join(publicDir, publicInternalDir, string(content))
+	cache.publicFileMapURL.Store(c, url) // Cache the URL
+	return url
 }

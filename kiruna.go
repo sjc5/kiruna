@@ -76,6 +76,9 @@ func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
 func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
 	return k.Config.GetServeStaticHandler(pathPrefix, cacheImmutably)
 }
+func (k Kiruna) GetPublicFileMapElements() template.HTML {
+	return template.HTML(k.Config.GetPublicFileMapElements())
+}
 
 func New(config *ik.Config) *Kiruna {
 	if config.Logger == nil {

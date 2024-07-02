@@ -96,7 +96,7 @@ func (c *Config) GetStyleSheetURL() string {
 		return ""
 	}
 
-	url := "/" + publicDir + "/" + string(content)
+	url := "/" + filepath.Join(publicDir, string(content))
 	cache.styleSheetURL.Store(c, url) // Cache the URL
 	return url
 }
