@@ -79,7 +79,10 @@ func (c *Config) getPreloadPublicFilemapLinkElement() string {
 func (c *Config) getPublicURLGetterScript() string {
 	return fmt.Sprintf(`<script type="module">
 	window.kiruna = {}; import { kirunaPublicFileMap } from "%s";
-	function getPublicURL(originalPublicURL) { return kirunaPublicFileMap[originalPublicURL] || originalPublicURL; }
+	function getPublicURL(originalPublicURL) { 
+		const url = kirunaPublicFileMap[originalPublicURL] || originalPublicURL;
+		return "/public/" + url;
+	}
 	window.kiruna.getPublicURL = getPublicURL;
 </script>`, c.getPublicFileMapURL())
 }
