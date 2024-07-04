@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 const (
@@ -12,145 +11,104 @@ const (
 	StyleSheetElementID  = "__normal-css"
 )
 
-func (c *Config) GetCriticalCSSStyleElement() template.HTML {
-	// If cache hit and PROD, return hit
-	if hit, isCached := cache.criticalCSS.Load(c); isCached && !KirunaEnv.GetIsDev() {
-		hit.mu.RLock()
-		defer hit.mu.RUnlock()
-		if hit.noSuchFile {
-			return ""
-		}
-		if hit.styleElIsCached {
-			return hit.styleEl
-		}
-	}
-
-	// Get critical CSS
-	css := c.GetCriticalCSS()
-	cached, _ := cache.criticalCSS.Load(c)
-
-	cached.mu.RLock()
-	noSuchFile := cached.noSuchFile
-	cached.mu.RUnlock()
-
-	// At this point, noSuchFile will have been set by GetCriticalCSS call above
-	if noSuchFile {
-		return ""
-	}
-
-	// Create style element
-	var sb strings.Builder
-	sb.WriteString(`<style id="`)
-	sb.WriteString(CriticalCSSElementID)
-	sb.WriteString(`">`)
-	sb.WriteString(css)
-	sb.WriteString("</style>")
-	el := template.HTML(sb.String())
-
-	cached.mu.Lock()
-	defer cached.mu.Unlock()
-	cached.styleEl = el           // Cache the element
-	cached.styleElIsCached = true // Set element as cached
-
-	return el
-}
-
-func (c *Config) GetStyleSheetLinkElement() template.HTML {
-	if hit, isCached := cache.styleSheetElement.Load(c); isCached && !KirunaEnv.GetIsDev() {
-		return hit
-	}
+func (c *Config) getInitialStyleSheetLinkElement() (*template.HTML, error) {
+	var result template.HTML
 
 	url := c.GetStyleSheetURL()
-	if url == "" {
-		cache.styleSheetElement.Store(c, "") // Cache the empty string
-		return ""
+
+	if url != "" {
+		var sb strings.Builder
+		sb.WriteString(`<link rel="stylesheet" href="`)
+		sb.WriteString(url)
+		sb.WriteString(`" id="`)
+		sb.WriteString(StyleSheetElementID)
+		sb.WriteString(`" />`)
+		result = template.HTML(sb.String())
 	}
 
-	var sb strings.Builder
-	sb.WriteString(`<link rel="stylesheet" href="`)
-	sb.WriteString(url)
-	sb.WriteString(`" id="`)
-	sb.WriteString(StyleSheetElementID)
-	sb.WriteString(`" />`)
-	el := template.HTML(sb.String())
-
-	cache.styleSheetElement.Store(c, el) // Cache the element
-	return el
+	return &result, nil
 }
 
-func (c *Config) GetStyleSheetURL() string {
-	if hit, isCached := cache.styleSheetURL.Load(c); isCached && !KirunaEnv.GetIsDev() {
-		return hit
-	}
-
+func (c *Config) getInitialStyleSheetURL() (string, error) {
 	fs, err := c.GetUniversalFS()
 	if err != nil {
 		c.Logger.Errorf("error getting FS: %v", err)
-		return ""
+		return "", err
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	content, err := fs.ReadFile(filepath.Join(internalDir, normalCSSFileRefFile))
 	if err != nil {
 		c.Logger.Errorf("error reading normal CSS URL: %v", err)
-		return ""
+		return "", err
 	}
 
-	url := "/" + filepath.Join(publicDir, string(content))
-	cache.styleSheetURL.Store(c, url) // Cache the URL
+	return "/" + filepath.Join(publicDir, string(content)), nil
+}
+
+func (c *Config) GetStyleSheetLinkElement() template.HTML {
+	res, _ := c.cache.styleSheetLinkElement.Get()
+	return *res
+}
+
+func (c *Config) GetStyleSheetURL() string {
+	url, _ := c.cache.styleSheetURL.Get()
 	return url
 }
 
 type criticalCSSStatus struct {
-	mu              sync.RWMutex
-	codeStr         string
-	noSuchFile      bool
-	styleEl         template.HTML
-	styleElIsCached bool
+	codeStr    string
+	noSuchFile bool
+	styleEl    template.HTML
 }
 
-func (c *Config) GetCriticalCSS() string {
-	// If cache hit and PROD, return hit
-	if hit, isCached := cache.criticalCSS.Load(c); isCached && !KirunaEnv.GetIsDev() {
-		hit.mu.RLock()
-		defer hit.mu.RUnlock()
-		if hit.noSuchFile {
-			return ""
-		}
-		return hit.codeStr
-	}
-
-	// Instantiate cache or get existing
-	cachedStatus, _ := cache.criticalCSS.LoadOrStore(c, &criticalCSSStatus{})
+func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
+	result := &criticalCSSStatus{}
 
 	// Get FS
 	fs, err := c.GetUniversalFS()
 	if err != nil {
 		c.Logger.Errorf("error getting FS: %v", err)
-		return ""
+		return result, err
 	}
 
 	// Read critical CSS
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	content, err := fs.ReadFile(filepath.Join(internalDir, criticalCSSFile))
-	cachedStatus.mu.Lock()
-	defer cachedStatus.mu.Unlock()
-
 	if err != nil {
 		// Check if the error is a non-existent file, and set the noSuchFile flag in the cache
-		cachedStatus.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
+		result.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
 
 		// if the error was something other than a non-existent file, log it
-		if !cachedStatus.noSuchFile {
+		if !result.noSuchFile {
 			c.Logger.Errorf("error reading critical CSS: %v", err)
 		}
-		return ""
+		return result, nil
 	}
 
-	criticalCSS := string(content)
-	cachedStatus.codeStr = criticalCSS // Cache the critical CSS
+	result.codeStr = string(content)
 
-	return criticalCSS
+	// Create style element
+	var sb strings.Builder
+	sb.WriteString(`<style id="`)
+	sb.WriteString(CriticalCSSElementID)
+	sb.WriteString(`">`)
+	sb.WriteString(result.codeStr)
+	sb.WriteString("</style>")
+
+	result.styleEl = template.HTML(sb.String())
+
+	return result, nil
+}
+
+func (c *Config) GetCriticalCSS() string {
+	result, _ := c.cache.criticalCSS.Get()
+	return result.codeStr
+}
+
+func (c *Config) GetCriticalCSSStyleElement() template.HTML {
+	result, _ := c.cache.criticalCSS.Get()
+	return result.styleEl
 }
 
 func naiveCSSMinify(content string) string {

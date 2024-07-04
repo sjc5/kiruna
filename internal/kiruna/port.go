@@ -12,9 +12,9 @@ const (
 )
 
 func MustGetPort() int {
-	isDev := KirunaEnv.GetIsDev()
-	portHasBeenSet := KirunaEnv.getPortHasBeenSet()
-	defaultPort := KirunaEnv.getPort()
+	isDev := GetIsDev()
+	portHasBeenSet := getPortHasBeenSet()
+	defaultPort := getPort()
 
 	if !isDev || portHasBeenSet {
 		return defaultPort
@@ -25,8 +25,8 @@ func MustGetPort() int {
 		log.Panicf("error: failed to get free port: %v", err)
 	}
 
-	KirunaEnv.setPort(port)
-	KirunaEnv.setPortHasBeenSet()
+	setPort(port)
+	setPortHasBeenSet()
 
 	return port
 }
@@ -44,11 +44,6 @@ func getFreePort(defaultPort int) (int, error) {
 		port := defaultPort + i
 		if port >= 0 && port <= 65535 {
 			if port, err := checkPortAvailability(port); err == nil {
-				Log.Warningf(
-					"port %d unavailable: falling back to port %d",
-					defaultPort,
-					port,
-				)
 				return port, nil
 			}
 		} else {

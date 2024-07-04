@@ -11,8 +11,6 @@ import (
 	"github.com/sjc5/kit/pkg/executil"
 )
 
-const fsTypeDev = "dev"
-
 type UniversalFS interface {
 	ReadFile(name string) ([]byte, error)
 	Open(name string) (fs.File, error)
@@ -41,24 +39,17 @@ func (u *universalFS) Sub(dir string) (UniversalFS, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newUniversalFS(subFS), nil
-}
-
-func newUniversalFS(fs fs.FS) UniversalFS {
-	return &universalFS{FS: fs}
+	return &universalFS{FS: subFS}, nil
 }
 
 func (c *Config) getIsUsingEmbeddedFS() bool {
 	return c.DistFS != nil
 }
 
-func (c *Config) getUniversalDirFS() UniversalFS {
-	if hit, isCached := cache.uniDirFS.Load(c); isCached {
-		return hit
-	}
-	fs := newUniversalFS(os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)))
-	actualFS, _ := cache.uniDirFS.LoadOrStore(c, fs)
-	return actualFS
+func (c *Config) getInitialUniversalDirFS() (UniversalFS, error) {
+	return &universalFS{
+		FS: os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)),
+	}, nil
 }
 
 func (c *Config) getFS(subDir string) (UniversalFS, error) {
@@ -81,38 +72,32 @@ func (c *Config) getFS(subDir string) (UniversalFS, error) {
 }
 
 func (c *Config) GetPublicFS() (UniversalFS, error) {
-	return c.getFS(publicDir)
+	return c.cache.publicFS.Get()
 }
 
 func (c *Config) GetPrivateFS() (UniversalFS, error) {
-	return c.getFS(privateDir)
+	return c.cache.privateFS.Get()
 }
 
 // GetUniversalFS returns a filesystem interface that works across different environments (dev/prod)
 // and supports both embedded and non-embedded filesystems.
 func (c *Config) GetUniversalFS() (UniversalFS, error) {
-	if hit, isCached := cache.uniFS.Load(c); isCached {
-		cachedFSType, _ := cache.fsType.Load(c)
-		skipCache := KirunaEnv.GetIsDev() && cachedFSType != fsTypeDev
-		if !skipCache {
-			return hit, nil
-		}
-	}
+	return c.cache.uniFS.Get()
+}
 
+// GetUniversalFS returns a filesystem interface that works across different environments (dev/prod)
+// and supports both embedded and non-embedded filesystems.
+func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 	// DEV
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
-	if KirunaEnv.GetIsDev() {
-		// ensures "needsReset" is always true in dev
-		cache.fsType.Store(c, fsTypeDev)
-
+	if GetIsDev() {
 		c.Logger.Infof("using disk file system (development)")
-		fs := newUniversalFS(os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)))
-		actualFS, _ := cache.uniFS.LoadOrStore(c, fs) // cache the fs
-		return actualFS, nil
+		return &universalFS{
+			FS: os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)),
+		}, nil
 	}
 
-	// PROD
 	// If we are using the embedded file system, we should use the dist file system
 	if c.getIsUsingEmbeddedFS() {
 		c.Logger.Infof("using embedded file system (production)")
@@ -121,24 +106,24 @@ func (c *Config) GetUniversalFS() (UniversalFS, error) {
 		// //go:embed kiruna
 		// That means that the kiruna folder itself (not just its contents) is embedded.
 		// So we have to drop down into the kiruna folder here.
-		FS, err := fs.Sub(c.DistFS, "kiruna")
+		FS, err := fs.Sub(c.DistFS, kirunaDir)
 		if err != nil {
 			return nil, err
 		}
-		fs := newUniversalFS(FS)
-		actualFS, _ := cache.uniFS.LoadOrStore(c, fs) // cache the fs
-		return actualFS, nil
+
+		return &universalFS{FS: FS}, nil
 	}
 
-	// PROD
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
 	c.Logger.Infof("using disk file system (production)")
+
 	execDir, err := executil.GetExecutableDir()
 	if err != nil {
 		return nil, err
 	}
-	fs := newUniversalFS(os.DirFS(execDir))
-	actualFS, _ := cache.uniFS.LoadOrStore(c, fs) // cache the fs
-	return actualFS, nil
+
+	return &universalFS{
+		FS: os.DirFS(execDir),
+	}, nil
 }

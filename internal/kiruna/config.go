@@ -3,13 +3,15 @@ package ik
 import (
 	"io/fs"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/sjc5/kit/pkg/colorlog"
 )
 
 type Logger colorlog.Logger
 
 type Config struct {
+	dev
+	runtime
+
 	/*
 		If not nil, the embedded file system will be used in production builds.
 		If nil, the disk file system will be used in production builds.
@@ -40,9 +42,6 @@ type Config struct {
 	DevConfig *DevConfig
 
 	Logger Logger
-
-	watcher *fsnotify.Watcher
-	manager *clientManager
 }
 
 type DevConfig struct {

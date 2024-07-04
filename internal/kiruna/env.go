@@ -6,8 +6,6 @@ import (
 	"strconv"
 )
 
-var KirunaEnv = kirunaEnvType{}
-
 const (
 	modeKey              = "KIRUNA_ENV_MODE"
 	devModeVal           = "development"
@@ -15,19 +13,18 @@ const (
 	portHasBeenSetKey    = "KIRUNA_ENV_PORT_HAS_BEEN_SET"
 	refreshServerPortKey = "KIRUNA_ENV_REFRESH_SERVER_PORT"
 	trueStr              = "true"
+	isBuildTimeKey       = "KIRUNA_ENV_IS_BUILD_TIME"
 )
 
-type kirunaEnvType struct{}
-
-func (k kirunaEnvType) GetIsDev() bool {
+func GetIsDev() bool {
 	return os.Getenv(modeKey) == devModeVal
 }
 
-func (k kirunaEnvType) setPort(port int) {
+func setPort(port int) {
 	os.Setenv(portKey, fmt.Sprintf("%d", port))
 }
 
-func (k kirunaEnvType) getPort() int {
+func getPort() int {
 	port, err := strconv.Atoi(os.Getenv(portKey))
 	if err != nil {
 		return 0
@@ -35,15 +32,15 @@ func (k kirunaEnvType) getPort() int {
 	return port
 }
 
-func (k kirunaEnvType) setPortHasBeenSet() {
+func setPortHasBeenSet() {
 	os.Setenv(portHasBeenSetKey, trueStr)
 }
 
-func (k kirunaEnvType) getPortHasBeenSet() bool {
+func getPortHasBeenSet() bool {
 	return os.Getenv(portHasBeenSetKey) == trueStr
 }
 
-func (k kirunaEnvType) getRefreshServerPort() int {
+func getRefreshServerPort() int {
 	port, err := strconv.Atoi(os.Getenv(refreshServerPortKey))
 	if err != nil {
 		return 0
@@ -51,10 +48,22 @@ func (k kirunaEnvType) getRefreshServerPort() int {
 	return port
 }
 
-func (k kirunaEnvType) setModeToDev() {
+func setModeToDev() {
 	os.Setenv(modeKey, devModeVal)
 }
 
-func (k kirunaEnvType) setRefreshServerPort(port int) {
+func setRefreshServerPort(port int) {
 	os.Setenv(refreshServerPortKey, fmt.Sprintf("%d", port))
+}
+
+func setIsBuildTime() {
+	os.Setenv("KIRUNA_ENV_IS_BUILD_TIME", trueStr)
+}
+
+func getIsBuildTime() bool {
+	return os.Getenv("KIRUNA_ENV_IS_BUILD_TIME") == trueStr
+}
+
+func setIsNotBuildTime() {
+	os.Setenv("KIRUNA_ENV_IS_BUILD_TIME", "")
 }

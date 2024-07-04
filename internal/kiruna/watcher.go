@@ -4,23 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/fsnotify/fsnotify"
 )
 
 func (c *Config) mustSetupWatcher() {
 	defer c.mustKillAppDev()
 	cleanRootDir := c.getCleanRootDir()
-
-	for _, p := range naiveIgnoreDirPatterns {
-		ignoredDirPatterns = append(ignoredDirPatterns, filepath.Join(cleanRootDir, p))
-	}
-	for _, p := range c.DevConfig.IgnorePatterns.Dirs {
-		ignoredDirPatterns = append(ignoredDirPatterns, filepath.Join(cleanRootDir, p))
-	}
-	for _, p := range c.DevConfig.IgnorePatterns.Files {
-		ignoredFilePatterns = append(ignoredFilePatterns, filepath.Join(cleanRootDir, p))
-	}
 
 	// Loop through all WatchedFiles...
 	for i, wfc := range c.DevConfig.WatchedFiles {
@@ -36,21 +24,9 @@ func (c *Config) mustSetupWatcher() {
 		}
 	}
 
-	defaultWatchedFiles = append(defaultWatchedFiles, WatchedFile{
-		Pattern:    filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
-		RestartApp: true,
-	})
+	defer c.watcher.Close()
 
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		errMsg := fmt.Sprintf("error: failed to create watcher: %v", err)
-		c.Logger.Error(errMsg)
-		panic(errMsg)
-	}
-	defer watcher.Close()
-	c.watcher = watcher
-
-	err = c.addDirs(c.getCleanRootDir())
+	err := c.addDirs(c.getCleanRootDir())
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to add directories to watcher: %v", err)
 		c.Logger.Error(errMsg)
@@ -75,7 +51,7 @@ func (c *Config) addDirs(path string) error {
 			return fmt.Errorf("error walking path: %v", err)
 		}
 		if info.IsDir() {
-			if c.getIsIgnored(walkedPath, &ignoredDirPatterns) {
+			if c.getIsIgnored(walkedPath, c.ignoredDirPatterns) {
 				return filepath.SkipDir
 			}
 			err := c.watcher.Add(walkedPath)

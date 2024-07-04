@@ -16,11 +16,11 @@ const (
 	PrivateFileMapGobName = "private_filemap.gob"
 )
 
-func (c *Config) loadMapFromGob(gobFileName string, useDirFS bool) (map[string]string, error) {
+func (c *Config) loadMapFromGob(gobFileName string) (map[string]string, error) {
 	var FS UniversalFS
 	var err error
-	if useDirFS {
-		FS = c.getUniversalDirFS()
+	if getIsBuildTime() {
+		FS, err = c.cache.uniDirFS.Get()
 	} else {
 		FS, err = c.GetUniversalFS()
 	}
@@ -91,25 +91,24 @@ func (c *Config) GetPublicFileMapElements() string {
 	return c.getPreloadPublicFilemapLinkElement() + "\n" + c.getPublicURLGetterScript()
 }
 
-func (c *Config) getPublicFileMapURL() string {
-	if hit, isCached := cache.publicFileMapURL.Load(c); isCached && !KirunaEnv.GetIsDev() {
-		return hit
-	}
-
+func (c *Config) getInitialPublicFileMapURL() (string, error) {
 	fs, err := c.GetUniversalFS()
 	if err != nil {
 		c.Logger.Errorf("error getting FS: %v", err)
-		return ""
+		return "", err
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	content, err := fs.ReadFile(filepath.Join(internalDir, publicFileMapFileRefFile))
 	if err != nil {
 		c.Logger.Errorf("error reading publicFileMapFileRefFile: %v", err)
-		return ""
+		return "", err
 	}
 
-	url := "/" + filepath.Join(publicDir, publicInternalDir, string(content))
-	cache.publicFileMapURL.Store(c, url) // Cache the URL
+	return "/" + filepath.Join(publicDir, publicInternalDir, string(content)), nil
+}
+
+func (c *Config) getPublicFileMapURL() string {
+	url, _ := c.cache.publicFileMapURL.Get()
 	return url
 }

@@ -12,10 +12,7 @@ import (
 	"sync"
 
 	"github.com/sjc5/kit/pkg/fsutil"
-	"golang.org/x/sync/semaphore"
 )
-
-var fileSemaphore = semaphore.NewWeighted(100)
 
 type syncMap struct {
 	sync.RWMutex
@@ -161,6 +158,9 @@ func (s *syncString) string() string {
 
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func (c *Config) processCSS(subDir string) error {
+	setIsBuildTime()
+	defer setIsNotBuildTime()
+
 	cleanRootDir := c.getCleanRootDir()
 
 	dirPath := filepath.Join(cleanRootDir, "styles", subDir)
@@ -189,11 +189,11 @@ func (c *Config) processCSS(subDir string) error {
 		wg.Add(1)
 		go func(fn string) {
 			defer wg.Done()
-			if err := fileSemaphore.Acquire(context.Background(), 1); err != nil {
+			if err := c.fileSemaphore.Acquire(context.Background(), 1); err != nil {
 				c.Logger.Errorf("Error acquiring semaphore: %v", err)
 				return
 			}
-			defer fileSemaphore.Release(1)
+			defer c.fileSemaphore.Release(1)
 
 			content, err := os.ReadFile(filepath.Join(dirPath, fn))
 			if err != nil {
@@ -211,7 +211,7 @@ func (c *Config) processCSS(subDir string) error {
 		rawUrl := urlRegex.FindStringSubmatch(match)[1]
 		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
 		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
-			hashedUrl := c.GetPublicURL(cleanedUrl, true)
+			hashedUrl, _ := c.getInitialPublicURL(cleanedUrl)
 			return fmt.Sprintf("url(%s)", hashedUrl)
 		} else {
 			return match // Leave external URLs unchanged
@@ -309,6 +309,9 @@ type fileInfo struct {
 }
 
 func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
+	setIsBuildTime()
+	defer setIsNotBuildTime()
+
 	cleanRootDir := c.getCleanRootDir()
 	srcDir := filepath.Join(cleanRootDir, staticDir, opts.dirName)
 	distDir := filepath.Join(cleanRootDir, distKirunaDir, staticDir, opts.dirName)
@@ -323,7 +326,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	// Load old file map if granular updates are enabled
 	if opts.shouldBeGranular {
 		var err error
-		oldMap, err := c.loadMapFromGob(opts.mapName, true)
+		oldMap, err := c.loadMapFromGob(opts.mapName)
 		if err != nil {
 			return fmt.Errorf("error reading old file map: %v", err)
 		}
@@ -416,10 +419,10 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 }
 
 func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFileMap, oldFileMap *syncMap, distDir string) error {
-	if err := fileSemaphore.Acquire(context.Background(), 1); err != nil {
+	if err := c.fileSemaphore.Acquire(context.Background(), 1); err != nil {
 		return fmt.Errorf("error acquiring semaphore: %v", err)
 	}
-	defer fileSemaphore.Release(1)
+	defer c.fileSemaphore.Release(1)
 
 	relativePathUnderscores := strings.ReplaceAll(fi.relativePath, "/", "_")
 

@@ -76,11 +76,11 @@ func (c *Config) mustReloadBroadcast(rfp refreshFilePayload) {
 	panic(errMsg)
 }
 
-func GetRefreshScript(config *Config) string {
-	if !KirunaEnv.GetIsDev() {
+func (c *Config) GetRefreshScript() string {
+	if !GetIsDev() {
 		return ""
 	}
-	inner := GetRefreshScriptInner(KirunaEnv.getRefreshServerPort())
+	inner := GetRefreshScriptInner(getRefreshServerPort())
 	return "\n<script>\n" + inner + "\n</script>"
 }
 

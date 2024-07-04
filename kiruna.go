@@ -5,13 +5,14 @@ import (
 	"net/http"
 
 	ik "github.com/sjc5/kiruna/internal/kiruna"
+	"github.com/sjc5/kit/pkg/colorlog"
 )
 
 type Config = ik.Config
 type DevConfig = ik.DevConfig
 
 type Kiruna struct {
-	Config *ik.Config
+	c *Config
 }
 
 // If you want to do a custom build command, just use
@@ -19,20 +20,20 @@ type Kiruna struct {
 // and then you can control your build yourself afterwards.
 
 func (k Kiruna) Build() error {
-	return k.Config.Build(true, false)
+	return k.c.Build(true, false)
 }
 func (k Kiruna) BuildWithoutCompilingGo() error {
-	return k.Config.Build(false, false)
+	return k.c.Build(false, false)
 }
 
-func (k Kiruna) GetPublicFS() (ik.UniversalFS, error) {
-	return k.Config.GetPublicFS()
+func (k Kiruna) GetPublicFS() (UniversalFS, error) {
+	return k.c.GetPublicFS()
 }
-func (k Kiruna) GetPrivateFS() (ik.UniversalFS, error) {
-	return k.Config.GetPrivateFS()
+func (k Kiruna) GetPrivateFS() (UniversalFS, error) {
+	return k.c.GetPrivateFS()
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
-	return k.Config.GetPublicURL(originalPublicURL, false)
+	return k.c.GetPublicURL(originalPublicURL)
 }
 
 /*
@@ -43,20 +44,20 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
  * pass a map of public URLs to a Go template.
  */
 func (k Kiruna) MakePublicURLsMap(filepaths []string) map[string]string {
-	return k.Config.MakePublicURLsMap(filepaths, false)
+	return k.c.MakePublicURLsMap(filepaths)
 }
-func (k Kiruna) MustStartDev(devConfig *ik.DevConfig) {
-	k.Config.DevConfig = devConfig
-	k.Config.MustStartDev()
+func (k Kiruna) MustStartDev(devConfig *DevConfig) {
+	k.c.DevConfig = devConfig
+	k.c.MustStartDev()
 }
 func (k Kiruna) GetCriticalCSS() template.CSS {
-	return template.CSS(k.Config.GetCriticalCSS())
+	return template.CSS(k.c.GetCriticalCSS())
 }
 func (k Kiruna) GetStyleSheetURL() string {
-	return k.Config.GetStyleSheetURL()
+	return k.c.GetStyleSheetURL()
 }
 func (k Kiruna) GetRefreshScript() template.HTML {
-	return template.HTML(ik.GetRefreshScript(k.Config))
+	return template.HTML(k.c.GetRefreshScript())
 }
 func (k Kiruna) GetCriticalCSSElementID() string {
 	return ik.CriticalCSSElementID
@@ -64,29 +65,28 @@ func (k Kiruna) GetCriticalCSSElementID() string {
 func (k Kiruna) GetStyleSheetElementID() string {
 	return ik.StyleSheetElementID
 }
-func (k Kiruna) GetUniversalFS() (ik.UniversalFS, error) {
-	return k.Config.GetUniversalFS()
+func (k Kiruna) GetUniversalFS() (UniversalFS, error) {
+	return k.c.GetUniversalFS()
 }
 func (k Kiruna) GetCriticalCSSStyleElement() template.HTML {
-	return k.Config.GetCriticalCSSStyleElement()
+	return k.c.GetCriticalCSSStyleElement()
 }
 func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
-	return k.Config.GetStyleSheetLinkElement()
+	return k.c.GetStyleSheetLinkElement()
 }
 func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
-	return k.Config.GetServeStaticHandler(pathPrefix, cacheImmutably)
+	return k.c.GetServeStaticHandler(pathPrefix, cacheImmutably)
 }
 func (k Kiruna) GetPublicFileMapElements() template.HTML {
-	return template.HTML(k.Config.GetPublicFileMapElements())
+	return template.HTML(k.c.GetPublicFileMapElements())
 }
 
-func New(config *ik.Config) *Kiruna {
-	if config.Logger == nil {
-		config.Logger = &ik.Log
+func New(c *ik.Config) *Kiruna {
+	if c.Logger == nil {
+		c.Logger = &colorlog.Log{Label: "Kiruna"}
 	}
-	return &Kiruna{
-		Config: config,
-	}
+	c.RuntimeInitOnce()
+	return &Kiruna{c}
 }
 
 type WatchedFile = ik.WatchedFile
@@ -103,4 +103,4 @@ const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
 
 var SetupDistDir = ik.SetupDistDir
 var MustGetPort = ik.MustGetPort
-var GetIsDev = ik.KirunaEnv.GetIsDev
+var GetIsDev = ik.GetIsDev

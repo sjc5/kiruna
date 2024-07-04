@@ -1,11 +1,9 @@
 package ik
 
 import (
-	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
-	"sync"
 	"unicode"
 )
 
@@ -23,37 +21,19 @@ func (c *Config) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) h
 	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS)))
 }
 
-func (c *Config) GetPublicURL(originalPublicURL string, useDirFS bool) string {
-	fileMapKey := fmt.Sprintf("%p", c) + fmt.Sprintf("%t", useDirFS)
-	urlKey := fileMapKey + originalPublicURL
+func (c *Config) getInitialPublicFileMapFromGob() (map[string]string, error) {
+	return c.loadMapFromGob(PublicFileMapGobName)
+}
 
-	if hit, isCached := cache.publicURLs.Load(urlKey); isCached {
-		return hit
-	}
-
-	once, _ := cache.fileMapLoadOnce.LoadOrStore(fileMapKey, &sync.Once{})
-	var fileMapFromGob map[string]string
-	once.Do(func() {
-		var err error
-		fileMapFromGob, err = c.loadMapFromGob(PublicFileMapGobName, useDirFS)
-		if err != nil {
-			c.Logger.Errorf("error loading file map from gob: %v", err)
-			return
-		}
-		cache.fileMapFromGob.Store(fileMapKey, fileMapFromGob)
-	})
-
-	if fileMapFromGob == nil {
-		fileMapFromGob, _ = cache.fileMapFromGob.Load(fileMapKey)
-	}
-	if fileMapFromGob == nil {
-		return originalPublicURL
+func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
+	fileMapFromGob, err := c.cache.publicFileMapFromGob.Get()
+	if err != nil {
+		c.Logger.Errorf("error getting public file map from gob: %v", err)
+		return originalPublicURL, err
 	}
 
 	if hashedURL, existsInFileMap := fileMapFromGob[cleanURL(originalPublicURL)]; existsInFileMap {
-		finalURL := "/" + publicDir + "/" + hashedURL
-		cache.publicURLs.Store(urlKey, finalURL) // Cache the hashed URL
-		return finalURL
+		return "/" + publicDir + "/" + hashedURL, nil
 	}
 
 	// If no hashed URL found, return the original URL
@@ -61,17 +41,16 @@ func (c *Config) GetPublicURL(originalPublicURL string, useDirFS bool) string {
 		"GetPublicURL: no hashed URL found for %s, returning original URL",
 		originalPublicURL,
 	)
-	finalURL := "/" + publicDir + "/" + originalPublicURL
-	cache.publicURLs.Store(urlKey, finalURL) // Cache the original URL
-	return finalURL
+
+	return "/" + publicDir + "/" + originalPublicURL, nil
 }
 
-func (c *Config) MakePublicURLsMap(filepaths []string, useDirFS bool) map[string]string {
-	cacheKey := c.getPublicFileMapURL() + fmt.Sprintf("%p", c) + fmt.Sprintf("%t", useDirFS) + strings.Join(filepaths, "")
-	if hit, isCached := cache.publicURLsMap.Load(cacheKey); isCached {
-		return hit
-	}
+func (c *Config) GetPublicURL(originalPublicURL string) string {
+	url, _ := c.cache.publicURLs.Get(originalPublicURL)
+	return url
+}
 
+func (c *Config) getInitialPublicURLsMap(filepaths []string) (map[string]string, error) {
 	filepathsMap := make(map[string]string, len(filepaths))
 	var sb strings.Builder
 	sb.Grow(64)
@@ -85,12 +64,19 @@ func (c *Config) MakePublicURLsMap(filepaths []string, useDirFS bool) map[string
 				sb.WriteRune('_')
 			}
 		}
-		safeKey := sb.String()
-		filepathsMap[safeKey] = c.GetPublicURL(filepath, useDirFS)
+		filepathsMap[sb.String()] = c.GetPublicURL(filepath)
 	}
 
-	actual, _ := cache.publicURLsMap.LoadOrStore(cacheKey, filepathsMap)
-	return actual
+	return filepathsMap, nil
+}
+
+func (c *Config) publicFileMapKeyMaker(filepaths []string) string {
+	return c.getPublicFileMapURL() + strings.Join(filepaths, "")
+}
+
+func (c *Config) MakePublicURLsMap(filepaths []string) map[string]string {
+	urlsMap, _ := c.cache.publicURLsMap.Get(filepaths)
+	return urlsMap
 }
 
 func cleanURL(url string) string {

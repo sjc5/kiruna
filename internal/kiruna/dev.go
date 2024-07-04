@@ -15,14 +15,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-var (
-	naiveIgnoreDirPatterns = [4]string{"**/.git", "**/node_modules", "dist/bin", distKirunaDir}
-	ignoredDirPatterns     = []string{}
-	ignoredFilePatterns    = []string{}
-	defaultWatchedFile     = WatchedFile{}
-	defaultWatchedFiles    = []WatchedFile{}
-)
-
 const (
 	healthCheckWarningA = `WARNING: No healthcheck endpoint found, setting to "/".`
 	healthCheckWarningB = `To set this explicitly, use the "HealthcheckEndpoint" field in your dev config.`
@@ -42,7 +34,9 @@ func (c *Config) MustStartDev() {
 		c.DevConfig.HealthcheckEndpoint = "/"
 	}
 
-	KirunaEnv.setModeToDev()
+	setModeToDev()
+
+	c.devInitOnce()
 
 	c.killPriorPID()
 
@@ -56,7 +50,7 @@ func (c *Config) MustStartDev() {
 
 	// Set refresh server port
 	if freePort, err := getFreePort(defaultFreePort); err == nil {
-		KirunaEnv.setRefreshServerPort(freePort)
+		setRefreshServerPort(freePort)
 	} else {
 		c.Logger.Errorf("error: failed to get free port for refresh server: %v", err)
 		panic(err)
@@ -74,82 +68,75 @@ func (c *Config) MustStartDev() {
 		return
 	}
 
-	c.Logger.Infof("initializing sidecar refresh server on port %d", KirunaEnv.getRefreshServerPort())
+	c.Logger.Infof("initializing sidecar refresh server on port %d", getRefreshServerPort())
 
-	manager := newClientManager()
-	c.manager = manager
-	go manager.start()
+	go c.manager.start()
 	go c.mustSetupWatcher()
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		sseHandler(manager)(w, r)
+		sseHandler(c.manager)(w, r)
 	})
 
 	mux.HandleFunc("/get-refresh-script-inner", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "text/javascript")
-		w.Write([]byte(GetRefreshScriptInner(KirunaEnv.getRefreshServerPort())))
+		w.Write([]byte(GetRefreshScriptInner(getRefreshServerPort())))
 	})
 
-	if err := http.ListenAndServe(":"+strconv.Itoa(KirunaEnv.getRefreshServerPort()), mux); err != nil {
+	if err := http.ListenAndServe(":"+strconv.Itoa(getRefreshServerPort()), mux); err != nil {
 		errMsg := fmt.Sprintf("error: failed to start refresh server: %v", err)
 		c.Logger.Error(errMsg)
 		panic(errMsg)
 	}
 }
 
-var (
-	lastBuildCmd  *exec.Cmd
-	buildCmdMutex sync.Mutex
-)
-
 func (c *Config) mustKillAppDev() {
-	buildCmdMutex.Lock()
-	defer buildCmdMutex.Unlock()
+	c.lastBuildCmd.mu.Lock()
+	defer c.lastBuildCmd.mu.Unlock()
 
-	if lastBuildCmd != nil {
-		if err := lastBuildCmd.Process.Kill(); err != nil {
+	if c.lastBuildCmd.v != nil {
+		if err := c.lastBuildCmd.v.Process.Kill(); err != nil {
 			errMsg := fmt.Sprintf(
 				"error: failed to kill running app with pid %d: %v",
-				lastBuildCmd.Process.Pid,
+				c.lastBuildCmd.v.Process.Pid,
 				err,
 			)
 			c.Logger.Error(errMsg)
 			panic(errMsg)
 		} else {
-			c.Logger.Infof("killed app with pid %d", lastBuildCmd.Process.Pid)
+			c.Logger.Infof("killed app with pid %d", c.lastBuildCmd.v.Process.Pid)
 
 			if err := c.deletePIDFile(); err != nil {
 				c.Logger.Errorf("error: failed to delete PID file: %v", err)
 			}
 
-			lastBuildCmd = nil
+			c.lastBuildCmd.v = nil
 		}
 	}
 }
 
 func (c *Config) mustStartAppDev() {
-	buildCmdMutex.Lock()
-	defer buildCmdMutex.Unlock()
+	c.lastBuildCmd.mu.Lock()
+	defer c.lastBuildCmd.mu.Unlock()
 
 	buildDest := filepath.Join(c.getCleanRootDir(), "dist/bin/main")
 
-	lastBuildCmd = exec.Command(buildDest)
-	lastBuildCmd.Stdout = os.Stdout
-	lastBuildCmd.Stderr = os.Stderr
+	c.lastBuildCmd.v = exec.Command(buildDest)
+	c.lastBuildCmd.v.Stdout = os.Stdout
+	c.lastBuildCmd.v.Stderr = os.Stderr
 
-	if err := lastBuildCmd.Start(); err != nil {
+	if err := c.lastBuildCmd.v.Start(); err != nil {
 		errMsg := fmt.Sprintf("error: failed to start app: %v", err)
 		c.Logger.Error(errMsg)
 		panic(errMsg)
 	}
 
-	c.Logger.Infof("app started with pid %d", lastBuildCmd.Process.Pid)
+	c.Logger.Infof("app started with pid %d", c.lastBuildCmd.v.Process.Pid)
 
-	if err := c.writePIDFile(lastBuildCmd.Process.Pid); err != nil {
+	if err := c.writePIDFile(c.lastBuildCmd.v.Process.Pid); err != nil {
 		c.Logger.Errorf("error: failed to write PID file: %v", err)
 	}
 }
@@ -199,7 +186,7 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 
 		wfc := evtDetails.wfc
 		if wfc == nil {
-			wfc = &defaultWatchedFile
+			wfc = c.defaultWatchedFile
 		}
 
 		if _, alreadyHandled := wfcsAlreadyHandled[wfc.Pattern]; alreadyHandled {
@@ -275,7 +262,7 @@ func (c *Config) mustHandleFileChange(
 ) error {
 	wfc := evtDetails.wfc
 	if wfc == nil {
-		wfc = &defaultWatchedFile
+		wfc = c.defaultWatchedFile
 	}
 
 	if !c.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS && !isPartOfBatch {

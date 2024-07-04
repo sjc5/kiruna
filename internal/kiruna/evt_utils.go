@@ -29,7 +29,7 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
 	var matchingWatchedFile *WatchedFile
 
 	for _, wfc := range c.DevConfig.WatchedFiles {
-		isMatch := c.getIsMatch(wfc.Pattern, evt.Name)
+		isMatch := c.getIsMatch(potentialMatch{pattern: wfc.Pattern, path: evt.Name})
 		if isMatch {
 			matchingWatchedFile = &wfc
 			break
@@ -37,8 +37,8 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
 	}
 
 	if matchingWatchedFile == nil {
-		for _, wfc := range defaultWatchedFiles {
-			isMatch := c.getIsMatch(wfc.Pattern, evt.Name)
+		for _, wfc := range *c.defaultWatchedFiles {
+			isMatch := c.getIsMatch(potentialMatch{pattern: wfc.Pattern, path: evt.Name})
 			if isMatch {
 				matchingWatchedFile = &wfc
 				break
@@ -53,7 +53,7 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
 
 	isOther := !isGo && !isKirunaCSS
 
-	isIgnored := c.getIsIgnored(evt.Name, &ignoredFilePatterns)
+	isIgnored := c.getIsIgnored(evt.Name, c.ignoredFilePatterns)
 	if isOther && matchingWatchedFile == nil {
 		isIgnored = true
 	}
