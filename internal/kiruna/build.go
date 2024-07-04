@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/sjc5/kit/pkg/fsutil"
+	"golang.org/x/sync/semaphore"
 )
 
 type syncMap struct {
@@ -43,6 +44,8 @@ func (e precompileError) Error() string {
 
 func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	cleanRootDir := c.getCleanRootDir()
+
+	c.fileSemaphore = semaphore.NewWeighted(100)
 
 	if !shouldBeGranular {
 
