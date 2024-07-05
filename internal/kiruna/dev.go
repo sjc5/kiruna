@@ -238,6 +238,8 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 	}
 
 	for _, evtDetails := range relevantFileChanges {
+		c.Logger.Info(evtDetails.evt.String())
+
 		err := c.mustHandleFileChange(evtDetails, hasMultipleEvents)
 		if err != nil {
 			c.Logger.Errorf("error: failed to handle file change: %v", err)
