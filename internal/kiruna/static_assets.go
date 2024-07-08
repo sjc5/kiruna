@@ -45,6 +45,8 @@ func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
 	return "/" + publicDir + "/" + originalPublicURL, nil
 }
 
+func publicURLsKeyMaker(x string) string { return x }
+
 func (c *Config) GetPublicURL(originalPublicURL string) string {
 	url, _ := c.cache.publicURLs.Get(originalPublicURL)
 	return url

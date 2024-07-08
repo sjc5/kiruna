@@ -54,7 +54,7 @@ func (c *Config) RuntimeInitOnce() {
 			// Public URLs
 			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, nil),
 			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, GetIsDev),
-			publicURLs:           safecache.NewMap[string, string](c.getInitialPublicURL, nil, nil),
+			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, nil),
 
 			// Template utils
 			publicURLsMap: safecache.NewMap(c.getInitialPublicURLsMap, c.publicFileMapKeyMaker, nil),
