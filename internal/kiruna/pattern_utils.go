@@ -28,7 +28,7 @@ func (c *Config) getInitialMatchResults(k potentialMatch) (bool, error) {
 }
 
 func (c *Config) getIsMatch(k potentialMatch) bool {
-	isMatch, _ := c.cache.matchResults.Get(k)
+	isMatch, _ := c.matchResults.Get(k)
 	return isMatch
 }
 

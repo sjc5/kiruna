@@ -31,9 +31,6 @@ type runtimeCache struct {
 
 	// Template utils
 	publicURLsMap *safecache.CacheMap[[]string, string, map[string]string]
-
-	// Dev
-	matchResults *safecache.CacheMap[potentialMatch, string, bool]
 }
 
 func (c *Config) RuntimeInitOnce() {
@@ -58,9 +55,6 @@ func (c *Config) RuntimeInitOnce() {
 
 			// Template utils
 			publicURLsMap: safecache.NewMap(c.getInitialPublicURLsMap, c.publicFileMapKeyMaker, nil),
-
-			// Dev
-			matchResults: safecache.NewMap(c.getInitialMatchResults, c.matchResultsKeyMaker, nil),
 		}
 	})
 }

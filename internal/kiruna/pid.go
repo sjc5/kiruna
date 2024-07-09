@@ -17,7 +17,7 @@ func newPIDFile(cleanRootDir string) *PIDFile {
 }
 
 func (p *PIDFile) getPIDFileRef() string {
-	return filepath.Join(p.cleanRootDir, "dist/kiruna/internal", "__kiruna_dev.pid")
+	return filepath.Join(p.cleanRootDir, distKirunaDir, internalDir, pidFile)
 }
 
 func (p *PIDFile) writePIDFile(pid int) error {
@@ -27,7 +27,7 @@ func (p *PIDFile) writePIDFile(pid int) error {
 func (p *PIDFile) readPIDFile() (int, error) {
 	data, err := os.ReadFile(p.getPIDFileRef())
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if os.IsNotExist(err) {
 			return 0, nil
 		}
 		return 0, fmt.Errorf("error reading PID file: %v", err)

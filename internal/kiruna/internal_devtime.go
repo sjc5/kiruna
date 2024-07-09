@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/sjc5/kit/pkg/safecache"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -26,6 +27,8 @@ type dev struct {
 	defaultWatchedFile     *WatchedFile
 	defaultWatchedFiles    *[]WatchedFile
 	lastBuildCmd           withMu[*exec.Cmd]
+	matchResults           *safecache.CacheMap[potentialMatch, string, bool]
+	pidFile                *PIDFile
 }
 
 func (c *Config) devInitOnce() {
@@ -66,8 +69,16 @@ func (c *Config) devInitOnce() {
 		// default watched files
 		c.defaultWatchedFile = &WatchedFile{}
 		c.defaultWatchedFiles = &[]WatchedFile{{
-			Pattern:    filepath.Join(cleanRootDir, "static/{public,private}/**/*"),
+			Pattern: filepath.Join(
+				cleanRootDir, fmt.Sprintf("%s/{%s,%s}/**/*", staticDir, publicDir, privateDir),
+			),
 			RestartApp: true,
 		}}
+
+		// matches
+		c.matchResults = safecache.NewMap(c.getInitialMatchResults, c.matchResultsKeyMaker, nil)
+
+		// single file stores
+		c.pidFile = newPIDFile(cleanRootDir)
 	})
 }

@@ -166,7 +166,7 @@ func (c *Config) processCSS(subDir string) error {
 
 	cleanRootDir := c.getCleanRootDir()
 
-	dirPath := filepath.Join(cleanRootDir, "styles", subDir)
+	dirPath := filepath.Join(cleanRootDir, stylesDir, subDir)
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		return nil
 	}

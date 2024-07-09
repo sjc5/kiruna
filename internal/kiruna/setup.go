@@ -15,8 +15,8 @@ func SetupDistDir(rootDir string) error {
 		return fmt.Errorf("error making internal directory: %v", err)
 	}
 
-	// add a x file so that go:embed doesn't complain
-	path = filepath.Join(cleanRootDir, distKirunaDir, "x")
+	// add an empty file so that go:embed doesn't complain
+	path = filepath.Join(cleanRootDir, distKirunaDir, goEmbedFixerFile)
 	if err := os.WriteFile(path, []byte(""), 0644); err != nil {
 		return fmt.Errorf("error making x file: %v", err)
 	}

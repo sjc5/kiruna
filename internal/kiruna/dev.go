@@ -122,7 +122,7 @@ func (c *Config) mustStartAppDev() {
 	c.lastBuildCmd.mu.Lock()
 	defer c.lastBuildCmd.mu.Unlock()
 
-	buildDest := filepath.Join(c.getCleanRootDir(), "dist/bin/main")
+	buildDest := filepath.Join(c.getCleanRootDir(), binOutPath)
 
 	c.lastBuildCmd.v = exec.Command(buildDest)
 	c.lastBuildCmd.v.Stdout = os.Stdout
