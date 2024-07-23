@@ -4,6 +4,13 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/sjc5/kit v0.0.34 h1:0uFdAkaGTBPwCLhCHWimgBZNAd/2JKbRaa+1loByo/k=
 github.com/sjc5/kit v0.0.34/go.mod h1:i1E63+5AqnXSZTopGf5KYOBKMplDq00IZ6X4NMhmBrg=
+github.com/tdewolff/minify/v2 v2.20.37 h1:Q97cx4STXCh1dlWDlNHZniE8BJ2EBL0+2b0n92BJQhw=
+github.com/tdewolff/minify/v2 v2.20.37/go.mod h1:L1VYef/jwKw6Wwyk5A+T0mBjjn3mMPgmjjA688RNsxU=
+github.com/tdewolff/parse/v2 v2.7.15 h1:hysDXtdGZIRF5UZXwpfn3ZWRbm+ru4l53/ajBRGpCTw=
+github.com/tdewolff/parse/v2 v2.7.15/go.mod h1:3FbJWZp3XT9OWVN3Hmfp0p/a08v4h8J9W1aghka0soA=
+github.com/tdewolff/test v1.0.11-0.20231101010635-f1265d231d52/go.mod h1:6DAvZliBAAnD7rhVgwaM7DE5/d9NMOAJ09SqYqeK4QE=
+github.com/tdewolff/test v1.0.11-0.20240106005702-7de5f7df4739 h1:IkjBCtQOOjIn03u/dMQK9g+Iw9ewps4mCl1nB8Sscbo=
+github.com/tdewolff/test v1.0.11-0.20240106005702-7de5f7df4739/go.mod h1:XPuWBzvdUzhCuxWO1ojpXsyzsA5bFoS3tO/Q3kFuTG8=
 golang.org/x/sync v0.7.0 h1:YsImfSBoP9QPYL0xyKJPq0gcaJdG3rInoqxTWbfQu9M=
 golang.org/x/sync v0.7.0/go.mod h1:Czt+wKu1gCyEFDUtn0jG5QVvpJ6rzVqr5aXyt9drQfk=
 golang.org/x/sys v0.17.0 h1:25cE3gD+tdBA7lp7QfhuV+rJiE9YXTcS3VG1SqssI/Y=

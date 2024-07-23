@@ -12,6 +12,8 @@ import (
 	"sync"
 
 	"github.com/sjc5/kit/pkg/fsutil"
+	"github.com/tdewolff/minify/v2"
+	"github.com/tdewolff/minify/v2/css"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -266,11 +268,18 @@ func (c *Config) processCSS(subDir string) error {
 		}
 	}
 
-	if subDir == "critical" {
-		concatenatedCSSString = naiveCSSMinify(concatenatedCSS.string())
+	finalCSS := concatenatedCSSString
+
+	if !GetIsDev() {
+		m := minify.New()
+		m.AddFunc("text/css", css.Minify)
+		finalCSS, err = m.String("text/css", concatenatedCSSString)
+		if err != nil {
+			return fmt.Errorf("error minifying CSS: %v", err)
+		}
 	}
 
-	return os.WriteFile(outputFile, []byte(concatenatedCSSString), 0644)
+	return os.WriteFile(outputFile, []byte(finalCSS), 0644)
 }
 
 type staticFileProcessorOpts struct {

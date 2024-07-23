@@ -26,6 +26,10 @@ func (c *Config) getInitialPublicFileMapFromGob() (map[string]string, error) {
 }
 
 func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
+	if strings.HasPrefix(originalPublicURL, "data:") {
+		return originalPublicURL, nil
+	}
+
 	fileMapFromGob, err := c.cache.publicFileMapFromGob.Get()
 	if err != nil {
 		c.Logger.Errorf("error getting public file map from gob: %v", err)

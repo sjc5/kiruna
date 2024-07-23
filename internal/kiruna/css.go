@@ -110,7 +110,3 @@ func (c *Config) GetCriticalCSSStyleElement() template.HTML {
 	result, _ := c.cache.criticalCSS.Get()
 	return result.styleEl
 }
-
-func naiveCSSMinify(content string) string {
-	return strings.Join(strings.Fields(content), " ")
-}
