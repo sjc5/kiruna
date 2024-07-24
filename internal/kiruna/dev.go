@@ -222,6 +222,21 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 	}
 
 	if hasMultipleEvents {
+		allEvtsAreNonEmptyCHMODOnly := true
+
+		for _, evtDetails := range relevantFileChanges {
+			if evtDetails.isNonEmptyCHMODOnly {
+				continue
+			} else {
+				allEvtsAreNonEmptyCHMODOnly = false
+				break
+			}
+		}
+
+		if allEvtsAreNonEmptyCHMODOnly {
+			return
+		}
+
 		c.manager.broadcast <- refreshFilePayload{
 			ChangeType: changeTypeRebuilding,
 		}
