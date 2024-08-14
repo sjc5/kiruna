@@ -5,3 +5,6 @@
 
 # OS
 .DS_Store
+
+# Test data
+testdata

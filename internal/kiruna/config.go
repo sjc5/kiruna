@@ -12,26 +12,22 @@ type Config struct {
 	dev
 	runtime
 
-	/*
-		If not nil, the embedded file system will be used in production builds.
-		If nil, the disk file system will be used in production builds.
-		Only relevant in prod (in dev mode, the real disk FS is always used).
-		If nil in prod, you need to make sure that you ship the dist directory
-		with your binary. For simplicity, we recommend using the embedded FS.
-	*/
+	// If not nil, the embedded file system will be used in production builds.
+	// If nil, the disk file system will be used in production builds.
+	// Only relevant in prod (in dev mode, the real disk FS is always used).
+	// If nil in prod, you need to make sure that you ship the dist directory
+	// with your binary. For simplicity, we recommend using the embedded FS.
 	DistFS fs.FS
 
-	/*
-		RootDir is the parent directory of the Kiruna-specific directories
-		(e.g., "dist", "static" and "styles"). It may be (and probably is)
-		the same as your project's root, but it doesn't have to be. RootDir
-		should be set relative your project's root (where you run your dev
-		and build commands from). For example, if your project's root is also
-		your RootDir, then RootDir should be set to ".". If RootDir is a
-		subdirectory of your project's root, then set it accordingly (e.g.,
-		"./app" or "./kiruna"). We do run filepath.Clean on the RootDir,
-		so if you leave it blank, it will default to ".".
-	*/
+	// RootDir is the parent directory of the Kiruna-specific directories
+	// (e.g., "dist", "static" and "styles"). It may be (and probably is)
+	// the same as your project's root, but it doesn't have to be. RootDir
+	// should be set relative your project's root (where you run your dev
+	// and build commands from). For example, if your project's root is also
+	// your RootDir, then RootDir should be set to ".". If RootDir is a
+	// subdirectory of your project's root, then set it accordingly (e.g.,
+	// "./app" or "./kiruna"). We do run filepath.Clean on the RootDir,
+	// so if you leave it blank, it will default to ".".
 	RootDir string
 
 	// Set EntryPoint relative to the RootDir, e.g., "./cmd/app/main.go".

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 )
 
 type PIDFile struct {
@@ -41,20 +42,53 @@ func (p *PIDFile) deletePIDFile() error {
 
 func (c *Config) killPriorPID() {
 	pidFile := &PIDFile{cleanRootDir: c.getCleanRootDir()}
-
 	priorPID, err := pidFile.readPIDFile()
-	if err == nil && priorPID > 0 {
-		priorProcess, _ := os.FindProcess(priorPID)
-		if priorProcess != nil {
-			if err := priorProcess.Kill(); err != nil {
-				if !errors.Is(err, os.ErrProcessDone) {
-					errMsg := fmt.Sprintf("error: failed to kill prior app with pid %d: %v", priorPID, err)
-					c.Logger.Error(errMsg)
-				}
-			} else {
-				c.Logger.Infof("killed prior app with pid %d", priorPID)
-			}
+	if err != nil {
+		c.Logger.Errorf("Error reading PID file: %v", err)
+		return
+	}
+	if priorPID <= 0 {
+		return
+	}
+
+	priorProcess, err := os.FindProcess(priorPID)
+	if err != nil {
+		c.Logger.Errorf("Error finding process with PID %d: %v", priorPID, err)
+		return
+	}
+
+	// Check if the process is running
+	err = priorProcess.Signal(syscall.Signal(0))
+	if err != nil {
+		if err == os.ErrProcessDone {
+			c.Logger.Infof("Process with PID %d is already terminated", priorPID)
+		} else {
+			c.Logger.Errorf("Error checking process with PID %d: %v", priorPID, err)
 		}
+		return
+	}
+
+	// Process is running, attempt to kill it
+	err = priorProcess.Kill()
+	if err != nil {
+		if !errors.Is(err, os.ErrProcessDone) {
+			c.Logger.Errorf("Failed to kill prior app with PID %d: %v", priorPID, err)
+		}
+		return
+	}
+
+	c.Logger.Infof("Killed prior app with PID %d", priorPID)
+
+	// Wait for the process to fully terminate
+	_, err = priorProcess.Wait()
+	if err != nil {
+		c.Logger.Errorf("Error waiting for process %d to terminate: %v", priorPID, err)
+	}
+
+	// Remove the PID file
+	err = pidFile.deletePIDFile()
+	if err != nil {
+		c.Logger.Errorf("Error removing PID file: %v", err)
 	}
 }
 
