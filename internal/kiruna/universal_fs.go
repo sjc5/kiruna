@@ -91,7 +91,7 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 	// DEV
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
-	if GetIsDev() {
+	if getIsDev() {
 		c.Logger.Infof("using disk file system (development)")
 		return &universalFS{
 			FS: os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)),

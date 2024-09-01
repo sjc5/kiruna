@@ -44,13 +44,13 @@ func (c *Config) RuntimeInitOnce() {
 			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, nil),
 
 			// CSS
-			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),
-			styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, GetIsDev),
-			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, GetIsDev),
+			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, getIsDev),
+			styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, getIsDev),
+			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, getIsDev),
 
 			// Public URLs
 			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, nil),
-			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, GetIsDev),
+			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, getIsDev),
 			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, nil),
 
 			// Template utils

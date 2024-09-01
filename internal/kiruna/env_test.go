@@ -11,7 +11,7 @@ func TestGetIsDev(t *testing.T) {
 		envValue string
 		want     bool
 	}{
-		{"DevMode", "development", true},
+		{"DevMode", devModeVal, true},
 		{"ProdMode", "production", false},
 		{"EmptyMode", "", false},
 	}
@@ -20,10 +20,10 @@ func TestGetIsDev(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resetEnv()
 			if tt.envValue != "" {
-				os.Setenv("KIRUNA_ENV_MODE", tt.envValue)
+				os.Setenv(modeKey, tt.envValue)
 			}
-			if got := GetIsDev(); got != tt.want {
-				t.Errorf("GetIsDev() = %v, want %v", got, tt.want)
+			if got := getIsDev(); got != tt.want {
+				t.Errorf("getIsDev() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -64,12 +64,12 @@ func TestBuildTimeFunctions(t *testing.T) {
 		t.Errorf("getIsBuildTime() = true, want false before setting")
 	}
 
-	setIsBuildTime()
+	setIsBuildTime(true)
 	if !getIsBuildTime() {
 		t.Errorf("getIsBuildTime() = false, want true after setting")
 	}
 
-	setIsNotBuildTime()
+	setIsBuildTime(false)
 	if getIsBuildTime() {
 		t.Errorf("getIsBuildTime() = true, want false after unsetting")
 	}

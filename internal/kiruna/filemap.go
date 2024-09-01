@@ -72,23 +72,21 @@ func (c *Config) savePublicFileMapJSToInternalPublicDir(mapToSave map[string]str
 	return os.WriteFile(filepath.Join(c.getCleanRootDir(), distKirunaDir, staticDir, publicDir, publicInternalDir, hashedFilename), bytes, 0644)
 }
 
-func (c *Config) getPreloadPublicFilemapLinkElement() string {
-	return fmt.Sprintf(`<link rel="modulepreload" href="%s">`, c.getPublicFileMapURL())
-}
-
-func (c *Config) getPublicURLGetterScript() string {
-	return fmt.Sprintf(`<script type="module">
-	window.kiruna = {}; import { kirunaPublicFileMap } from "%s";
-	function getPublicURL(originalPublicURL) { 
-		if (originalPublicURL.startsWith("/")) originalPublicURL = originalPublicURL.slice(1);
-		return "/public/" + (kirunaPublicFileMap[originalPublicURL] || originalPublicURL);
-	}
-	window.kiruna.getPublicURL = getPublicURL;
-</script>`, c.getPublicFileMapURL())
-}
-
 func (c *Config) GetPublicFileMapElements() string {
-	return c.getPreloadPublicFilemapLinkElement() + "\n" + c.getPublicURLGetterScript()
+	formatStr := `
+		<link rel="modulepreload" href="%s">
+		<script type="module">
+			import { kirunaPublicFileMap } from "%s";
+			if (!window.kiruna) window.kiruna = {};
+			function getPublicURL(originalPublicURL) { 
+				if (originalPublicURL.startsWith("/")) originalPublicURL = originalPublicURL.slice(1);
+				return "/public/" + (kirunaPublicFileMap[originalPublicURL] || originalPublicURL);
+			}
+			window.kiruna.getPublicURL = getPublicURL;
+		</script>
+		`
+
+	return fmt.Sprintf(formatStr, c.GetPublicFileMapURL(), c.GetPublicFileMapURL())
 }
 
 func (c *Config) getInitialPublicFileMapURL() (string, error) {
@@ -108,7 +106,7 @@ func (c *Config) getInitialPublicFileMapURL() (string, error) {
 	return "/" + filepath.Join(publicDir, publicInternalDir, string(content)), nil
 }
 
-func (c *Config) getPublicFileMapURL() string {
+func (c *Config) GetPublicFileMapURL() string {
 	url, _ := c.cache.publicFileMapURL.Get()
 	return url
 }

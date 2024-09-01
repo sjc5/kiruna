@@ -16,7 +16,7 @@ const (
 	isBuildTimeKey       = "KIRUNA_ENV_IS_BUILD_TIME"
 )
 
-func GetIsDev() bool {
+func getIsDev() bool {
 	return os.Getenv(modeKey) == devModeVal
 }
 
@@ -56,14 +56,14 @@ func setRefreshServerPort(port int) {
 	os.Setenv(refreshServerPortKey, fmt.Sprintf("%d", port))
 }
 
-func setIsBuildTime() {
-	os.Setenv("KIRUNA_ENV_IS_BUILD_TIME", trueStr)
+func setIsBuildTime(val bool) {
+	if val {
+		os.Setenv(isBuildTimeKey, trueStr)
+	} else {
+		os.Setenv(isBuildTimeKey, "")
+	}
 }
 
 func getIsBuildTime() bool {
-	return os.Getenv("KIRUNA_ENV_IS_BUILD_TIME") == trueStr
-}
-
-func setIsNotBuildTime() {
-	os.Setenv("KIRUNA_ENV_IS_BUILD_TIME", "")
+	return os.Getenv(isBuildTimeKey) == trueStr
 }

@@ -77,7 +77,7 @@ func (c *Config) getInitialPublicURLsMap(filepaths []string) (map[string]string,
 }
 
 func (c *Config) publicFileMapKeyMaker(filepaths []string) string {
-	return c.getPublicFileMapURL() + strings.Join(filepaths, "")
+	return c.GetPublicFileMapURL() + strings.Join(filepaths, "")
 }
 
 func (c *Config) MakePublicURLsMap(filepaths []string) map[string]string {

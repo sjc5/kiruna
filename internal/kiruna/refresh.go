@@ -77,7 +77,7 @@ func (c *Config) mustReloadBroadcast(rfp refreshFilePayload) {
 }
 
 func (c *Config) GetRefreshScript() string {
-	if !GetIsDev() {
+	if !getIsDev() {
 		return ""
 	}
 	inner := GetRefreshScriptInner(getRefreshServerPort())

@@ -60,11 +60,11 @@ func setupTestEnv(t *testing.T) *testEnv {
 		uniDirFS:              safecache.New(config.getInitialUniversalDirFS, nil),
 		publicFS:              safecache.New(func() (UniversalFS, error) { return config.getFS(publicDir) }, nil),
 		privateFS:             safecache.New(func() (UniversalFS, error) { return config.getFS(privateDir) }, nil),
-		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, GetIsDev),
-		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, GetIsDev),
-		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, GetIsDev),
+		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, getIsDev),
+		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, getIsDev),
+		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, getIsDev),
 		publicFileMapFromGob:  safecache.New(config.getInitialPublicFileMapFromGob, nil),
-		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, GetIsDev),
+		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, getIsDev),
 		publicURLs:            safecache.NewMap(config.getInitialPublicURL, publicURLsKeyMaker, nil),
 		publicURLsMap:         safecache.NewMap(config.getInitialPublicURLsMap, config.publicFileMapKeyMaker, nil),
 	}
@@ -73,7 +73,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	config.dev.matchResults = safecache.NewMap(config.getInitialMatchResults, config.matchResultsKeyMaker, nil)
 
 	// Set to production mode for testing
-	os.Setenv("KIRUNA_ENV_MODE", "production")
+	os.Setenv(modeKey, "production")
 
 	return &testEnv{
 		config: config,
@@ -89,7 +89,7 @@ func teardownTestEnv(t *testing.T) {
 	}
 
 	// Reset environment variables
-	os.Unsetenv("KIRUNA_ENV_MODE")
+	os.Unsetenv(modeKey)
 }
 
 // createTestFile creates a file with given content in the test environment
@@ -110,11 +110,11 @@ func (env *testEnv) createTestFile(t *testing.T, relativePath, content string) {
 
 // resetEnv resets environment variables to a known state
 func resetEnv() {
-	os.Unsetenv("KIRUNA_ENV_MODE")
-	os.Unsetenv("PORT")
-	os.Unsetenv("KIRUNA_ENV_PORT_HAS_BEEN_SET")
-	os.Unsetenv("KIRUNA_ENV_REFRESH_SERVER_PORT")
-	os.Unsetenv("KIRUNA_ENV_IS_BUILD_TIME")
+	os.Unsetenv(modeKey)
+	os.Unsetenv(portKey)
+	os.Unsetenv(portHasBeenSetKey)
+	os.Unsetenv(refreshServerPortKey)
+	os.Unsetenv(isBuildTimeKey)
 }
 
 func TestMain(m *testing.M) {

@@ -12,7 +12,7 @@ const (
 )
 
 func MustGetPort() int {
-	isDev := GetIsDev()
+	isDev := getIsDev()
 	portHasBeenSet := getPortHasBeenSet()
 	defaultPort := getPort()
 

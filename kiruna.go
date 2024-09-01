@@ -80,6 +80,9 @@ func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) ht
 func (k Kiruna) GetPublicFileMapElements() template.HTML {
 	return template.HTML(k.c.GetPublicFileMapElements())
 }
+func (k Kiruna) GetPublicFileMapURL() string {
+	return k.c.GetPublicFileMapURL()
+}
 
 func New(c *ik.Config) *Kiruna {
 	if c.Logger == nil {
@@ -103,4 +106,3 @@ const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
 
 var SetupDistDir = ik.SetupDistDir
 var MustGetPort = ik.MustGetPort
-var GetIsDev = ik.GetIsDev
