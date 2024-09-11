@@ -142,8 +142,6 @@ func (c *Config) buildCSS() error {
 	return nil
 }
 
-var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
-
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func (c *Config) processCSS(subDir string) error {
 	setIsBuildTime(true)
@@ -201,16 +199,7 @@ func (c *Config) processCSS(subDir string) error {
 	}
 
 	concatenatedCSSString := concatenatedCSS.String()
-	concatenatedCSSString = urlRegex.ReplaceAllStringFunc(concatenatedCSSString, func(match string) string {
-		rawUrl := urlRegex.FindStringSubmatch(match)[1]
-		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
-		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
-			hashedUrl, _ := c.getInitialPublicURL(cleanedUrl)
-			return fmt.Sprintf("url(%s)", hashedUrl)
-		} else {
-			return match // Leave external URLs unchanged
-		}
-	})
+	concatenatedCSSString = c.ResolveCSSURLFuncArgs(concatenatedCSSString)
 
 	// Determine output path and filename
 	var outputPath string
@@ -465,4 +454,19 @@ func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFile
 	}
 
 	return nil
+}
+
+var urlRegex = regexp.MustCompile(`url\(([^)]+)\)`)
+
+func (c *Config) ResolveCSSURLFuncArgs(css string) string {
+	return urlRegex.ReplaceAllStringFunc(css, func(match string) string {
+		rawUrl := urlRegex.FindStringSubmatch(match)[1]
+		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
+		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
+			hashedUrl, _ := c.getInitialPublicURL(cleanedUrl)
+			return fmt.Sprintf("url(%s)", hashedUrl)
+		} else {
+			return match // Leave external URLs unchanged
+		}
+	})
 }

@@ -36,16 +36,6 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 	return k.c.GetPublicURL(originalPublicURL)
 }
 
-/*
- * MakePublicURLsMap creates a map of public URLs for the given filepaths, where
- * the keys are sanitized versions of the filepaths, replacing non-alphanumeric
- * characters with underscores. For example, the filepath "javascript/main.js"
- * would be sanitized to "javascript_main_js". One use case for this is to
- * pass a map of public URLs to a Go template.
- */
-func (k Kiruna) MakePublicURLsMap(filepaths []string) map[string]string {
-	return k.c.MakePublicURLsMap(filepaths)
-}
 func (k Kiruna) MustStartDev(devConfig *DevConfig) {
 	k.c.DevConfig = devConfig
 	k.c.MustStartDev()
@@ -77,11 +67,20 @@ func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
 func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
 	return k.c.GetServeStaticHandler(pathPrefix, cacheImmutably)
 }
+func (k Kiruna) GetPublicFileMap() (map[string]string, error) {
+	return k.c.GetPublicFileMap()
+}
+func (k Kiruna) GetPublicFileMapKeys(excludedPrefixes []string) ([]string, error) {
+	return k.c.GetPublicFileMapKeys(excludedPrefixes)
+}
 func (k Kiruna) GetPublicFileMapElements() template.HTML {
 	return template.HTML(k.c.GetPublicFileMapElements())
 }
 func (k Kiruna) GetPublicFileMapURL() string {
 	return k.c.GetPublicFileMapURL()
+}
+func (k Kiruna) ResolveCSSURLFuncArgs(css string) string {
+	return k.c.ResolveCSSURLFuncArgs(css)
 }
 
 func New(c *ik.Config) *Kiruna {

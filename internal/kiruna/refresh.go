@@ -36,6 +36,7 @@ const (
 	changeTypeCriticalCSS changeType = "critical"
 	changeTypeOther       changeType = "other"
 	changeTypeRebuilding  changeType = "rebuilding"
+	changeTypeRevalidate  changeType = "revalidate"
 )
 
 func newClientManager() *clientManager {
@@ -111,9 +112,10 @@ const es = new EventSource("http://localhost:%d/events");
 es.onmessage = (e) => {
 	const { changeType, criticalCSS, normalCSSURL, at } = JSON.parse(e.data);
 	if (changeType == "rebuilding") {
-		console.log("Rebuilding server...");
+		console.log("KIRUNA DEV: Rebuilding server...");
 		const el = document.createElement("div");
 		el.innerHTML = "Rebuilding...";
+		el.id = "__refreshscript-rebuilding";
 		el.style.display = "flex";
 		el.style.position = "fixed";
 		el.style.inset = "0";
@@ -158,10 +160,23 @@ es.onmessage = (e) => {
 		newStyle.innerHTML = base64ToUTF8(criticalCSS);
 		document.head.replaceChild(newStyle, oldStyle);
 	}
+	if (changeType == "revalidate") {
+		console.log("KIRUNA DEV: Revalidating...");
+		const el = document.getElementById("__refreshscript-rebuilding");
+		if ("__kirunaRevalidate" in window) {
+			__kirunaRevalidate().then(() => {
+				console.log("KIRUNA DEV: Revalidated");
+				if (el) el.remove();
+			});
+		} else {
+			console.error("No __kirunaRevalidate() found");
+			if (el) el.remove();
+		}
+	}
 };
 
 es.addEventListener("error", (e) => {
-	console.log("SSE error", e);
+	console.log("KIRUNA DEV: SSE error", e);
 	es.close();
 	window.location.reload();
 });

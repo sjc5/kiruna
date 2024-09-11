@@ -66,7 +66,6 @@ func setupTestEnv(t *testing.T) *testEnv {
 		publicFileMapFromGob:  safecache.New(config.getInitialPublicFileMapFromGob, nil),
 		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, getIsDev),
 		publicURLs:            safecache.NewMap(config.getInitialPublicURL, publicURLsKeyMaker, nil),
-		publicURLsMap:         safecache.NewMap(config.getInitialPublicURLsMap, config.publicFileMapKeyMaker, nil),
 	}
 
 	// Initialize dev cache if needed

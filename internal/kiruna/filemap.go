@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sjc5/kit/pkg/fsutil"
 )
@@ -109,4 +110,29 @@ func (c *Config) getInitialPublicFileMapURL() (string, error) {
 func (c *Config) GetPublicFileMapURL() string {
 	url, _ := c.cache.publicFileMapURL.Get()
 	return url
+}
+
+func (c *Config) GetPublicFileMap() (map[string]string, error) {
+	return c.cache.publicFileMapFromGob.Get()
+}
+
+func (c *Config) GetPublicFileMapKeys(excludedPrefixes []string) ([]string, error) {
+	filemap, err := c.GetPublicFileMap()
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(filemap))
+	for k := range filemap {
+		shouldAppend := true
+		for _, prefix := range excludedPrefixes {
+			if strings.HasPrefix(k, prefix) {
+				shouldAppend = false
+				break
+			}
+		}
+		if shouldAppend {
+			keys = append(keys, k)
+		}
+	}
+	return keys, nil
 }
