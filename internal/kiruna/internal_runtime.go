@@ -27,10 +27,8 @@ type runtimeCache struct {
 	// Public URLs
 	publicFileMapFromGob *safecache.Cache[map[string]string]
 	publicFileMapURL     *safecache.Cache[string]
+	publicFileMapDetails *safecache.Cache[*publicFileMapDetails]
 	publicURLs           *safecache.CacheMap[string, string, string]
-
-	// Template utils
-	publicURLsMap *safecache.CacheMap[[]string, string, map[string]string]
 }
 
 func (c *Config) RuntimeInitOnce() {
@@ -44,17 +42,15 @@ func (c *Config) RuntimeInitOnce() {
 			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, nil),
 
 			// CSS
-			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),
-			styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, GetIsDev),
-			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, GetIsDev),
+			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, getIsDev),
+			styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, getIsDev),
+			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, getIsDev),
 
 			// Public URLs
 			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, nil),
-			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, GetIsDev),
+			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, getIsDev),
+			publicFileMapDetails: safecache.New(c.getInitialPublicFileMapDetails, getIsDev),
 			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, nil),
-
-			// Template utils
-			publicURLsMap: safecache.NewMap(c.getInitialPublicURLsMap, c.publicFileMapKeyMaker, nil),
 		}
 	})
 }

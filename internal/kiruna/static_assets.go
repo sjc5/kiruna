@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-	"unicode"
 )
 
 func (c *Config) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
@@ -54,35 +53,6 @@ func publicURLsKeyMaker(x string) string { return x }
 func (c *Config) GetPublicURL(originalPublicURL string) string {
 	url, _ := c.cache.publicURLs.Get(originalPublicURL)
 	return url
-}
-
-func (c *Config) getInitialPublicURLsMap(filepaths []string) (map[string]string, error) {
-	filepathsMap := make(map[string]string, len(filepaths))
-	var sb strings.Builder
-	sb.Grow(64)
-
-	for _, filepath := range filepaths {
-		sb.Reset()
-		for _, r := range filepath {
-			if unicode.IsLetter(r) || unicode.IsDigit(r) {
-				sb.WriteRune(r)
-			} else {
-				sb.WriteRune('_')
-			}
-		}
-		filepathsMap[sb.String()] = c.GetPublicURL(filepath)
-	}
-
-	return filepathsMap, nil
-}
-
-func (c *Config) publicFileMapKeyMaker(filepaths []string) string {
-	return c.getPublicFileMapURL() + strings.Join(filepaths, "")
-}
-
-func (c *Config) MakePublicURLsMap(filepaths []string) map[string]string {
-	urlsMap, _ := c.cache.publicURLsMap.Get(filepaths)
-	return urlsMap
 }
 
 func cleanURL(url string) string {

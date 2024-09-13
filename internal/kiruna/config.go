@@ -83,6 +83,15 @@ type WatchedFile struct {
 	// though it were an arbitrary non-Go file extension. Only relevant for Go files -- for
 	// non-Go files, this is a no-op.
 	TreatAsNonGo bool
+
+	// If set to true, everything will behave the same, except that instead of doing a hard reload
+	// of the browser window via `window.location.reload()`, Kiruna will instead run a method called
+	// `__kirunaRevalidate` (if it exists on the window object). This can be useful, for example,
+	// if you are running an external build process with enough intelligence to know how to inject
+	// newly built route-level CSS without hard-reloading the page. For example, your framework might
+	// provide you with a client-side revalidate function, in which case you'd set
+	// `window.__kirunaRevalidate` to that function, and set this field to true.
+	RunClientDefinedRevalidateFunc bool
 }
 
 type OnChangeFunc func(string) error

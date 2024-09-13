@@ -199,7 +199,7 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 			isGoOrNeedsHardReloadEvenIfNonGo = evtDetails.isGo
 		}
 		if !isGoOrNeedsHardReloadEvenIfNonGo {
-			isGoOrNeedsHardReloadEvenIfNonGo = wfc.RecompileBinary || wfc.RestartApp
+			isGoOrNeedsHardReloadEvenIfNonGo = getNeedsHardReloadEvenIfNonGo(wfc)
 		}
 
 		relevantFileChanges[evt.Name] = evtDetails
@@ -273,6 +273,10 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 	}
 }
 
+func getNeedsHardReloadEvenIfNonGo(wfc *WatchedFile) bool {
+	return wfc.RecompileBinary || wfc.RestartApp
+}
+
 func (c *Config) mustHandleFileChange(
 	evtDetails *EvtDetails,
 	isPartOfBatch bool,
@@ -288,7 +292,7 @@ func (c *Config) mustHandleFileChange(
 		}
 	}
 
-	needsHardReloadEvenIfNonGo := wfc.RecompileBinary || wfc.RestartApp
+	needsHardReloadEvenIfNonGo := getNeedsHardReloadEvenIfNonGo(wfc)
 
 	if evtDetails.isGo || wfc.RecompileBinary {
 		c.Logger.Infof("recompiling binary")
@@ -352,6 +356,12 @@ func (c *Config) mustHandleFileChange(
 		return nil
 	}
 
+	if wfc.RunClientDefinedRevalidateFunc {
+		c.Logger.Infof("revalidating browser")
+		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeRevalidate})
+		return nil
+	}
+
 	if !evtDetails.isKirunaCSS || needsHardReloadEvenIfNonGo {
 		c.Logger.Infof("hard reloading browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeOther})
@@ -382,7 +392,7 @@ func (c *Config) callback(wfc *WatchedFile, evtDetails *EvtDetails) error {
 	}
 
 	if evtDetails.isKirunaCSS {
-		if wfc.RecompileBinary || wfc.RestartApp {
+		if getNeedsHardReloadEvenIfNonGo(wfc) {
 			return c.runOtherFileBuild(wfc)
 		}
 		cssType := changeTypeNormalCSS

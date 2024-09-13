@@ -4,6 +4,8 @@ import (
 	"html/template"
 	"path/filepath"
 	"strings"
+
+	"github.com/sjc5/kit/pkg/htmlutil"
 )
 
 const (
@@ -60,6 +62,7 @@ type criticalCSSStatus struct {
 	codeStr    string
 	noSuchFile bool
 	styleEl    template.HTML
+	sha256Hash string
 }
 
 func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
@@ -69,7 +72,7 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 	fs, err := c.GetUniversalFS()
 	if err != nil {
 		c.Logger.Errorf("error getting FS: %v", err)
-		return result, err
+		return nil, err
 	}
 
 	// Read critical CSS
@@ -88,15 +91,26 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 
 	result.codeStr = string(content)
 
-	// Create style element
-	var sb strings.Builder
-	sb.WriteString(`<style id="`)
-	sb.WriteString(CriticalCSSElementID)
-	sb.WriteString(`">`)
-	sb.WriteString(result.codeStr)
-	sb.WriteString("</style>")
+	el := htmlutil.Element{
+		Tag:               "style",
+		TrustedAttributes: map[string]string{"id": CriticalCSSElementID},
+		InnerHTML:         template.HTML(result.codeStr),
+	}
 
-	result.styleEl = template.HTML(sb.String())
+	sha256Hash, err := htmlutil.AddSha256HashInline(&el, true)
+	if err != nil {
+		c.Logger.Errorf("error handling CSP: %v", err)
+		return nil, err
+	}
+	result.sha256Hash = sha256Hash
+
+	tpmlRes, err := htmlutil.RenderElement(&el)
+	if err != nil {
+		c.Logger.Errorf("error rendering element: %v", err)
+		return nil, err
+	}
+
+	result.styleEl = tpmlRes
 
 	return result, nil
 }
@@ -105,8 +119,11 @@ func (c *Config) GetCriticalCSS() string {
 	result, _ := c.cache.criticalCSS.Get()
 	return result.codeStr
 }
-
 func (c *Config) GetCriticalCSSStyleElement() template.HTML {
 	result, _ := c.cache.criticalCSS.Get()
 	return result.styleEl
+}
+func (c *Config) GetCriticalCSSStyleElementSha256Hash() string {
+	result, _ := c.cache.criticalCSS.Get()
+	return result.sha256Hash
 }
