@@ -49,6 +49,9 @@ func (k Kiruna) GetStyleSheetURL() string {
 func (k Kiruna) GetRefreshScript() template.HTML {
 	return template.HTML(k.c.GetRefreshScript())
 }
+func (k Kiruna) GetRefreshScriptSha256Hash() string {
+	return k.c.GetRefreshScriptSha256Hash()
+}
 func (k Kiruna) GetCriticalCSSElementID() string {
 	return ik.CriticalCSSElementID
 }
@@ -60,6 +63,9 @@ func (k Kiruna) GetUniversalFS() (UniversalFS, error) {
 }
 func (k Kiruna) GetCriticalCSSStyleElement() template.HTML {
 	return k.c.GetCriticalCSSStyleElement()
+}
+func (k Kiruna) GetCriticalCSSStyleElementSha256Hash() string {
+	return k.c.GetCriticalCSSStyleElementSha256Hash()
 }
 func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
 	return k.c.GetStyleSheetLinkElement()
@@ -74,7 +80,10 @@ func (k Kiruna) GetPublicFileMapKeys(excludedPrefixes []string) ([]string, error
 	return k.c.GetPublicFileMapKeys(excludedPrefixes)
 }
 func (k Kiruna) GetPublicFileMapElements() template.HTML {
-	return template.HTML(k.c.GetPublicFileMapElements())
+	return k.c.GetPublicFileMapElements()
+}
+func (k Kiruna) GetPublicFileMapScriptSha256Hash() string {
+	return k.c.GetPublicFileMapScriptSha256Hash()
 }
 func (k Kiruna) GetPublicFileMapURL() string {
 	return k.c.GetPublicFileMapURL()

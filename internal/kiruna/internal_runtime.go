@@ -27,6 +27,7 @@ type runtimeCache struct {
 	// Public URLs
 	publicFileMapFromGob *safecache.Cache[map[string]string]
 	publicFileMapURL     *safecache.Cache[string]
+	publicFileMapDetails *safecache.Cache[*publicFileMapDetails]
 	publicURLs           *safecache.CacheMap[string, string, string]
 }
 
@@ -48,6 +49,7 @@ func (c *Config) RuntimeInitOnce() {
 			// Public URLs
 			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, nil),
 			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, getIsDev),
+			publicFileMapDetails: safecache.New(c.getInitialPublicFileMapDetails, getIsDev),
 			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, nil),
 		}
 	})

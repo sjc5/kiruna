@@ -4,11 +4,13 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/sjc5/kit/pkg/fsutil"
+	"github.com/sjc5/kit/pkg/htmlutil"
 )
 
 const (
@@ -73,21 +75,54 @@ func (c *Config) savePublicFileMapJSToInternalPublicDir(mapToSave map[string]str
 	return os.WriteFile(filepath.Join(c.getCleanRootDir(), distKirunaDir, staticDir, publicDir, publicInternalDir, hashedFilename), bytes, 0644)
 }
 
-func (c *Config) GetPublicFileMapElements() string {
-	formatStr := `
-		<link rel="modulepreload" href="%s">
-		<script type="module">
-			import { kirunaPublicFileMap } from "%s";
-			if (!window.kiruna) window.kiruna = {};
-			function getPublicURL(originalPublicURL) { 
-				if (originalPublicURL.startsWith("/")) originalPublicURL = originalPublicURL.slice(1);
-				return "/public/" + (kirunaPublicFileMap[originalPublicURL] || originalPublicURL);
-			}
-			window.kiruna.getPublicURL = getPublicURL;
-		</script>
-		`
+type publicFileMapDetails struct {
+	Elements   template.HTML
+	Sha256Hash string
+}
 
-	return fmt.Sprintf(formatStr, c.GetPublicFileMapURL(), c.GetPublicFileMapURL())
+func (c *Config) getInitialPublicFileMapDetails() (*publicFileMapDetails, error) {
+	innerHTMLFormatStr := `
+		import { kirunaPublicFileMap } from "%s";
+		if (!window.kiruna) window.kiruna = {};
+		function getPublicURL(originalPublicURL) { 
+			if (originalPublicURL.startsWith("/")) originalPublicURL = originalPublicURL.slice(1);
+			return "/public/" + (kirunaPublicFileMap[originalPublicURL] || originalPublicURL);
+		}
+		window.kiruna.getPublicURL = getPublicURL;` + "\n"
+
+	publicFileMapURL := c.GetPublicFileMapURL()
+
+	linkEl := htmlutil.Element{
+		Tag:        "link",
+		Attributes: map[string]string{"rel": "modulepreload", "href": publicFileMapURL},
+	}
+
+	scriptEl := htmlutil.Element{
+		Tag:        "script",
+		Attributes: map[string]string{"type": "module"},
+		InnerHTML:  template.HTML(fmt.Sprintf(innerHTMLFormatStr, publicFileMapURL)),
+	}
+
+	sha256Hash, err := htmlutil.AddSha256HashInline(&scriptEl, true)
+	if err != nil {
+		return nil, fmt.Errorf("error handling CSP: %v", err)
+	}
+
+	var htmlBuilder strings.Builder
+
+	err = htmlutil.RenderElementToBuilder(&linkEl, &htmlBuilder)
+	if err != nil {
+		return nil, fmt.Errorf("error rendering element to builder: %v", err)
+	}
+	err = htmlutil.RenderElementToBuilder(&scriptEl, &htmlBuilder)
+	if err != nil {
+		return nil, fmt.Errorf("error rendering element to builder: %v", err)
+	}
+
+	return &publicFileMapDetails{
+		Elements:   template.HTML(htmlBuilder.String()),
+		Sha256Hash: sha256Hash,
+	}, nil
 }
 
 func (c *Config) getInitialPublicFileMapURL() (string, error) {
@@ -111,9 +146,16 @@ func (c *Config) GetPublicFileMapURL() string {
 	url, _ := c.cache.publicFileMapURL.Get()
 	return url
 }
-
 func (c *Config) GetPublicFileMap() (map[string]string, error) {
 	return c.cache.publicFileMapFromGob.Get()
+}
+func (c *Config) GetPublicFileMapElements() template.HTML {
+	details, _ := c.cache.publicFileMapDetails.Get()
+	return details.Elements
+}
+func (c *Config) GetPublicFileMapScriptSha256Hash() string {
+	details, _ := c.cache.publicFileMapDetails.Get()
+	return details.Sha256Hash
 }
 
 func (c *Config) GetPublicFileMapKeys(excludedPrefixes []string) ([]string, error) {
