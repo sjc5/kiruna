@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/sjc5/kit/pkg/htmltestutil"
 )
 
 func TestGetCriticalCSS(t *testing.T) {
@@ -29,8 +31,18 @@ func TestGetCriticalCSSStyleElement(t *testing.T) {
 	env.createTestFile(t, "dist/kiruna/internal/critical.css", criticalCSS)
 
 	result := env.config.GetCriticalCSSStyleElement()
-	expected := template.HTML(`<style id="` + CriticalCSSElementID + `">body { color: red; }</style>`)
-	if result != expected {
+	expected := template.HTML(`<style id="` + CriticalCSSElementID + `" integrity="sha256-XeYlw2NVzOfB1UCIJqCyGr+0n7bA4fFslFpvKu84IAw=">body { color: red; }</style>`)
+
+	parsedResult, err := htmltestutil.ParseHTML(string(result))
+	if err != nil {
+		t.Fatalf("Failed to parse result: %v", err)
+	}
+	parsedExpected, err := htmltestutil.ParseHTML(string(expected))
+	if err != nil {
+		t.Fatalf("Failed to parse expected: %v", err)
+	}
+
+	if !htmltestutil.CompareNodes(parsedResult, parsedExpected) {
 		t.Errorf("GetCriticalCSSStyleElement() = %v, want %v", result, expected)
 	}
 }

@@ -17,6 +17,8 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+var noHashPublicDirsByVersion = map[uint8]string{0: "__nohash", 1: "prehashed"}
+
 type syncMap struct {
 	sync.RWMutex
 	m map[string]string
@@ -264,7 +266,7 @@ type staticFileProcessorOpts struct {
 	dirName          string
 	mapName          string
 	shouldBeGranular bool
-	getIsNoHashDir   func(string) bool
+	getIsNoHashDir   func(string) (bool, uint8)
 	writeWithHash    bool
 }
 
@@ -273,8 +275,14 @@ func (c *Config) handlePublicFiles(shouldBeGranular bool) error {
 		dirName:          publicDir,
 		mapName:          PublicFileMapGobName,
 		shouldBeGranular: shouldBeGranular,
-		getIsNoHashDir: func(path string) bool {
-			return strings.HasPrefix(path, "__nohash/")
+		getIsNoHashDir: func(path string) (bool, uint8) {
+			if strings.HasPrefix(path, noHashPublicDirsByVersion[1]) {
+				return true, 1
+			}
+			if strings.HasPrefix(path, noHashPublicDirsByVersion[0]) {
+				return true, 0
+			}
+			return false, 0
 		},
 		writeWithHash: true,
 	})
@@ -285,8 +293,8 @@ func (c *Config) copyPrivateFiles(shouldBeGranular bool) error {
 		dirName:          privateDir,
 		mapName:          PrivateFileMapGobName,
 		shouldBeGranular: shouldBeGranular,
-		getIsNoHashDir: func(path string) bool {
-			return false
+		getIsNoHashDir: func(path string) (bool, uint8) {
+			return false, 0
 		},
 		writeWithHash: false,
 	})
@@ -342,9 +350,9 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 					return err
 				}
 				relativePath = filepath.ToSlash(relativePath)
-				isNoHashDir := opts.getIsNoHashDir(relativePath)
+				isNoHashDir, version := opts.getIsNoHashDir(relativePath)
 				if isNoHashDir {
-					relativePath = strings.TrimPrefix(relativePath, "__nohash/")
+					relativePath = strings.TrimPrefix(relativePath, noHashPublicDirsByVersion[version]+"/")
 				}
 				fileChan <- fileInfo{path: path, relativePath: relativePath, isNoHashDir: isNoHashDir}
 			}

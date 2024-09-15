@@ -36,10 +36,10 @@ func (c *Config) RuntimeInitOnce() {
 		// cache
 		c.cache = runtimeCache{
 			// FS
-			uniFS:     safecache.New(c.getInitialUniversalFS, nil),
-			uniDirFS:  safecache.New(c.getInitialUniversalDirFS, nil),
-			publicFS:  safecache.New(func() (UniversalFS, error) { return c.getFS(publicDir) }, nil),
-			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, nil),
+			uniFS:     safecache.New(c.getInitialUniversalFS, getIsDev),
+			uniDirFS:  safecache.New(c.getInitialUniversalDirFS, getIsDev),
+			publicFS:  safecache.New(func() (UniversalFS, error) { return c.getFS(publicDir) }, getIsDev),
+			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, getIsDev),
 
 			// CSS
 			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, getIsDev),
@@ -47,10 +47,10 @@ func (c *Config) RuntimeInitOnce() {
 			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, getIsDev),
 
 			// Public URLs
-			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, nil),
+			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, getIsDev),
 			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, getIsDev),
 			publicFileMapDetails: safecache.New(c.getInitialPublicFileMapDetails, getIsDev),
-			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, nil),
+			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, func(string) bool { return getIsDev() }),
 		}
 	})
 }

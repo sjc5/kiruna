@@ -45,7 +45,7 @@ Then run the following commands to create the necessary directories and files fo
 ```sh
 # Scaffold directories
 mkdir -p cmd/app cmd/build cmd/dev
-mkdir -p static/private static/public/__nohash
+mkdir -p static/private static/public/prehashed
 mkdir -p styles/critical styles/normal
 mkdir -p dist/kiruna internal/platform
 
