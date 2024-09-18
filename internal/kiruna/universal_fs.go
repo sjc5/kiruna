@@ -92,7 +92,6 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
 	if getIsDev() {
-		c.Logger.Infof("using disk file system (development)")
 		return &universalFS{
 			FS: os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)),
 		}, nil
@@ -100,8 +99,6 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 
 	// If we are using the embedded file system, we should use the dist file system
 	if c.getIsUsingEmbeddedFS() {
-		c.Logger.Infof("using embedded file system (production)")
-
 		// Assuming the embed directive looks like this:
 		// //go:embed kiruna
 		// That means that the kiruna folder itself (not just its contents) is embedded.
@@ -116,8 +113,6 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
-	c.Logger.Infof("using disk file system (production)")
-
 	execDir, err := executil.GetExecutableDir()
 	if err != nil {
 		return nil, err
