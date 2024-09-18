@@ -9,10 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -111,6 +111,7 @@ func (c *Config) mustKillAppDev() {
 
 			if err := c.deletePIDFile(); err != nil {
 				c.Logger.Errorf("error: failed to delete PID file: %v", err)
+				// now just move on, not the end of the world
 			}
 
 			c.lastBuildCmd.v = nil
@@ -138,6 +139,7 @@ func (c *Config) mustStartAppDev() {
 
 	if err := c.writePIDFile(c.lastBuildCmd.v.Process.Pid); err != nil {
 		c.Logger.Errorf("error: failed to write PID file: %v", err)
+		// now just move on, not the end of the world
 	}
 }
 
@@ -242,14 +244,13 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 		}
 	}
 
-	wg := sync.WaitGroup{}
+	eg := errgroup.Group{}
 	if hasMultipleEvents && isGoOrNeedsHardReloadEvenIfNonGo {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		eg.Go(func() error {
 			c.Logger.Infof("killing app")
 			c.mustKillAppDev()
-		}()
+			return nil
+		})
 	}
 
 	for _, evtDetails := range relevantFileChanges {
@@ -258,11 +259,15 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 		err := c.mustHandleFileChange(evtDetails, hasMultipleEvents)
 		if err != nil {
 			c.Logger.Errorf("error: failed to handle file change: %v", err)
+			return
 		}
 	}
 
 	if hasMultipleEvents && isGoOrNeedsHardReloadEvenIfNonGo {
-		wg.Wait()
+		if err := eg.Wait(); err != nil {
+			c.Logger.Errorf("error: failed to kill app: %v", err)
+			return
+		}
 		c.Logger.Infof("restarting app")
 		c.mustStartAppDev()
 		return
@@ -300,54 +305,66 @@ func (c *Config) mustHandleFileChange(
 
 	needsKillAndRestart := (evtDetails.isGo || needsHardReloadEvenIfNonGo) && !isPartOfBatch
 
-	wg := sync.WaitGroup{}
+	killAndRestartEG := errgroup.Group{}
 	if needsKillAndRestart {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		killAndRestartEG.Go(func() error {
 			c.Logger.Infof("killing app")
 			c.mustKillAppDev()
-		}()
+			return nil
+		})
 	}
 
 	sortedOnChanges := sortOnChangeCallbacks(wfc.OnChangeCallbacks)
 
-	var buildErr error
-
 	if sortedOnChanges.exists {
+		// Kiruna has no control over error handling for "no-wait" callbacks.
+		// They might not even be finished until after Kiruna has already
+		// restarted the app (in fact, that's the point).
 		go func() {
-			c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrentNoWait, evtDetails.evt.Name, false)
+			_ = c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrentNoWait, evtDetails.evt.Name, false)
 		}()
 
-		c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPre, evtDetails.evt.Name)
+		if err := c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPre, evtDetails.evt.Name); err != nil {
+			c.Logger.Errorf("error: failed to build: %v", err)
+			return err
+		}
 
 		if wfc.RunOnChangeOnly {
 			c.Logger.Infof("ran applicable onChange callbacks")
 			return nil
 		}
 
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			buildErr = c.callback(wfc, evtDetails)
-		}()
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return c.callback(wfc, evtDetails)
+		})
 
-		c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrent, evtDetails.evt.Name, true)
-		wg.Wait()
+		if err := c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrent, evtDetails.evt.Name, true); err != nil {
+			c.Logger.Errorf("error: failed to build: %v", err)
+			return err
+		}
+
+		if err := eg.Wait(); err != nil {
+			c.Logger.Errorf("error: failed to build: %v", err)
+			return err
+		}
 	} else {
-		buildErr = c.callback(wfc, evtDetails)
+		if err := c.callback(wfc, evtDetails); err != nil {
+			c.Logger.Errorf("error: failed to build: %v", err)
+			return err
+		}
 	}
 
-	if buildErr != nil {
-		c.Logger.Errorf("error: failed to build: %v", buildErr)
-		return buildErr
+	if err := c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPost, evtDetails.evt.Name); err != nil {
+		c.Logger.Errorf("error: failed to build: %v", err)
+		return err
 	}
-
-	c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPost, evtDetails.evt.Name)
 
 	if needsKillAndRestart {
-		wg.Wait()
+		if err := killAndRestartEG.Wait(); err != nil {
+			c.Logger.Errorf("error: failed to kill app: %v", err)
+			return err
+		}
 		c.Logger.Infof("restarting app")
 		c.mustStartAppDev()
 	}

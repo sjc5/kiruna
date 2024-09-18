@@ -1,6 +1,8 @@
 package ik
 
-import "sync"
+import (
+	"golang.org/x/sync/errgroup"
+)
 
 const (
 	OnChangeStrategyPre              = "pre"
@@ -49,30 +51,39 @@ func sortOnChangeCallbacks(onChanges []OnChange) sortedOnChangeCallbacks {
 	}
 }
 
-func (c *Config) runConcurrentOnChangeCallbacks(onChanges *[]OnChange, evtName string, shouldWait bool) {
+func (c *Config) runConcurrentOnChangeCallbacks(onChanges *[]OnChange, evtName string, shouldWait bool) error {
 	if len(*onChanges) > 0 {
-		wg := sync.WaitGroup{}
-		wg.Add(len(*onChanges))
+		eg := errgroup.Group{}
 		for _, o := range *onChanges {
 			if c.getIsIgnored(evtName, &o.ExcludedPatterns) {
-				wg.Done()
 				continue
 			}
-			go func(o OnChange) {
-				defer wg.Done()
+			eg.Go(func() error {
 				err := o.Func(evtName)
 				if err != nil {
 					c.Logger.Errorf("error running extension callback: %v", err)
+					return err
 				}
-			}(o)
+				return nil
+			})
 		}
+
 		if shouldWait {
-			wg.Wait()
+			err := eg.Wait()
+			if err != nil {
+				return err
+			}
 		}
+
+		// Kiruna has no control over error handling for "no-wait" callbacks
+		// We simple call the function in a goroutine
+		return nil
 	}
+
+	return nil
 }
 
-func (c *Config) simpleRunOnChangeCallbacks(onChanges *[]OnChange, evtName string) {
+func (c *Config) simpleRunOnChangeCallbacks(onChanges *[]OnChange, evtName string) error {
 	for _, o := range *onChanges {
 		if c.getIsIgnored(evtName, &o.ExcludedPatterns) {
 			continue
@@ -80,6 +91,8 @@ func (c *Config) simpleRunOnChangeCallbacks(onChanges *[]OnChange, evtName strin
 		err := o.Func(evtName)
 		if err != nil {
 			c.Logger.Errorf("error running extension callback: %v", err)
+			return err
 		}
 	}
+	return nil
 }

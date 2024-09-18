@@ -70,8 +70,15 @@ func (k Kiruna) GetCriticalCSSStyleElementSha256Hash() string {
 func (k Kiruna) GetStyleSheetLinkElement() template.HTML {
 	return k.c.GetStyleSheetLinkElement()
 }
-func (k Kiruna) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
-	return k.c.GetServeStaticHandler(pathPrefix, cacheImmutably)
+func (k Kiruna) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeaders bool) (http.Handler, error) {
+	return k.c.GetServeStaticHandler(pathPrefix, addImmutableCacheHeaders)
+}
+func (k Kiruna) MustGetServeStaticHandler(pathPrefix string, addImmutableCacheHeaders bool) http.Handler {
+	handler, err := k.c.GetServeStaticHandler(pathPrefix, addImmutableCacheHeaders)
+	if err != nil {
+		panic(err)
+	}
+	return handler
 }
 func (k Kiruna) GetPublicFileMap() (map[string]string, error) {
 	return k.c.GetPublicFileMap()

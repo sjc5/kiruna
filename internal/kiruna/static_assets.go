@@ -1,23 +1,27 @@
 package ik
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
 )
 
-func (c *Config) GetServeStaticHandler(pathPrefix string, cacheImmutably bool) http.Handler {
+func (c *Config) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeaders bool) (http.Handler, error) {
 	FS, err := c.GetPublicFS()
 	if err != nil {
-		c.Logger.Errorf("error getting public FS: %v", err)
+		errMsg := fmt.Sprintf("error getting public FS: %v", err)
+		c.Logger.Error(errMsg)
+		return nil, errors.New(errMsg)
 	}
-	if cacheImmutably {
+	if addImmutableCacheHeaders {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS))).ServeHTTP(w, r)
-		})
+		}), nil
 	}
-	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS)))
+	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS))), nil
 }
 
 func (c *Config) getInitialPublicFileMapFromGob() (map[string]string, error) {

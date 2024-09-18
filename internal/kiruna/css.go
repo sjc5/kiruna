@@ -82,9 +82,9 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 		// Check if the error is a non-existent file, and set the noSuchFile flag in the cache
 		result.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
 
-		// if the error was something other than a non-existent file, log it
 		if !result.noSuchFile {
 			c.Logger.Errorf("error reading critical CSS: %v", err)
+			return nil, err
 		}
 		return result, nil
 	}

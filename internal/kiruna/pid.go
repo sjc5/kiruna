@@ -83,6 +83,7 @@ func (c *Config) killPriorPID() {
 	_, err = priorProcess.Wait()
 	if err != nil {
 		c.Logger.Errorf("Error waiting for process %d to terminate: %v", priorPID, err)
+		// now just move on, not the end of the world
 	}
 
 	// Remove the PID file

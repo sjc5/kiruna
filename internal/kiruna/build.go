@@ -12,30 +12,13 @@ import (
 	"sync"
 
 	"github.com/sjc5/kit/pkg/fsutil"
+	"github.com/sjc5/kit/pkg/typed"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
 	"golang.org/x/sync/semaphore"
 )
 
 var noHashPublicDirsByVersion = map[uint8]string{0: "__nohash", 1: "prehashed"}
-
-type syncMap struct {
-	sync.RWMutex
-	m map[string]string
-}
-
-func (sm *syncMap) Store(key, value string) {
-	sm.Lock()
-	defer sm.Unlock()
-	sm.m[key] = value
-}
-
-func (sm *syncMap) Load(key string) (string, bool) {
-	sm.RLock()
-	defer sm.RUnlock()
-	v, ok := sm.m[key]
-	return v, ok
-}
 
 type precompileError struct {
 	task string
@@ -318,8 +301,8 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		return nil
 	}
 
-	newFileMap := &syncMap{m: make(map[string]string)}
-	oldFileMap := &syncMap{m: make(map[string]string)}
+	newFileMap := typed.SyncMap[string, string]{}
+	oldFileMap := typed.SyncMap[string, string]{}
 
 	// Load old file map if granular updates are enabled
 	if opts.shouldBeGranular {
@@ -370,7 +353,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		go func() {
 			defer wg.Done()
 			for fi := range fileChan {
-				if err := c.processFile(fi, opts, newFileMap, oldFileMap, distDir); err != nil {
+				if err := c.processFile(fi, opts, &newFileMap, &oldFileMap, distDir); err != nil {
 					errChan <- err
 					return
 				}
@@ -389,25 +372,31 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 
 	// Cleanup old moot files if granular updates are enabled
 	if opts.shouldBeGranular {
-		for k, v := range oldFileMap.m {
+		var oldMapErr error
+		oldFileMap.Range(func(k, v string) bool {
 			if newHash, exists := newFileMap.Load(k); !exists || newHash != v {
 				oldDistPath := filepath.Join(distDir, v)
 				err := os.Remove(oldDistPath)
 				if err != nil && !os.IsNotExist(err) {
-					return fmt.Errorf("error removing old static file from dist (%s/%s): %v", opts.dirName, v, err)
+					oldMapErr = fmt.Errorf("error removing old static file from dist (%s/%s): %v", opts.dirName, v, err)
+					return false
 				}
 			}
+			return true
+		})
+		if oldMapErr != nil {
+			return oldMapErr
 		}
 	}
 
 	// Save the updated file map
-	err := c.saveMapToGob(newFileMap.m, opts.mapName)
+	err := c.saveMapToGob(toStdMap(&newFileMap), opts.mapName)
 	if err != nil {
 		return fmt.Errorf("error saving file map: %v", err)
 	}
 
 	if opts.dirName == publicDir {
-		err = c.savePublicFileMapJSToInternalPublicDir(newFileMap.m)
+		err = c.savePublicFileMapJSToInternalPublicDir(toStdMap(&newFileMap))
 		if err != nil {
 			return fmt.Errorf("error saving public file map JSON: %v", err)
 		}
@@ -416,7 +405,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	return nil
 }
 
-func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFileMap, oldFileMap *syncMap, distDir string) error {
+func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFileMap, oldFileMap *typed.SyncMap[string, string], distDir string) error {
 	if err := c.fileSemaphore.Acquire(context.Background(), 1); err != nil {
 		return fmt.Errorf("error acquiring semaphore: %v", err)
 	}
@@ -477,4 +466,13 @@ func (c *Config) ResolveCSSURLFuncArgs(css string) string {
 			return match // Leave external URLs unchanged
 		}
 	})
+}
+
+func toStdMap(sm *typed.SyncMap[string, string]) map[string]string {
+	m := map[string]string{}
+	sm.Range(func(k, v string) bool {
+		m[k] = v
+		return true
+	})
+	return m
 }
