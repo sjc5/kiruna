@@ -2,6 +2,8 @@ github.com/bmatcuk/doublestar/v4 v4.6.1 h1:FH9SifrbvJhnlQpztAx++wlkk70QBf0iBWDwN
 github.com/bmatcuk/doublestar/v4 v4.6.1/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
+github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/sjc5/kit v0.0.62 h1:Wi0EFW4NP0CtWcUKBY6O+7zcnFL2BbWWmjhlWlzHIS4=
 github.com/sjc5/kit v0.0.62/go.mod h1:6evTjkACUsyBdNw3oZk/gAh/6bVTRjy8SCgFibOTzm4=
 github.com/tdewolff/minify/v2 v2.20.37 h1:Q97cx4STXCh1dlWDlNHZniE8BJ2EBL0+2b0n92BJQhw=

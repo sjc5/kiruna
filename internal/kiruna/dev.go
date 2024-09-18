@@ -77,7 +77,7 @@ func (c *Config) MustStartDev() {
 
 	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		sseHandler(c.manager)(w, r)
+		websocketHandler(c.manager)(w, r)
 	})
 
 	mux.HandleFunc("/get-refresh-script-inner", func(w http.ResponseWriter, r *http.Request) {

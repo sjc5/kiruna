@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/sjc5/kit/pkg/bytesutil"
 	"github.com/sjc5/kit/pkg/cryptoutil"
 	"github.com/sjc5/kit/pkg/htmlutil"
 )
 
-// clientManager manages all SSE clients
+// clientManager manages all WebSocket clients
 type clientManager struct {
 	clients    map[*client]bool
 	register   chan *client
@@ -19,10 +20,11 @@ type clientManager struct {
 	broadcast  chan refreshFilePayload
 }
 
-// Client represents a single SSE connection
+// Client represents a single WebSocket connection
 type client struct {
 	id     string
-	notify chan<- refreshFilePayload
+	conn   *websocket.Conn
+	notify chan refreshFilePayload
 }
 
 type Base64 = string
@@ -63,10 +65,15 @@ func (manager *clientManager) start() {
 			if _, ok := manager.clients[client]; ok {
 				delete(manager.clients, client)
 				close(client.notify)
+				client.conn.Close()
 			}
 		case msg := <-manager.broadcast:
 			for client := range manager.clients {
-				client.notify <- msg
+				select {
+				case client.notify <- msg:
+				default:
+					// Skip clients that are not ready to receive messages
+				}
 			}
 		}
 	}
@@ -109,8 +116,8 @@ func GetRefreshScriptInner(port int) string {
 // Element IDs: "__refreshscript-rebuilding", "__normal-css", "__critical-css"
 const refreshScriptFmt = `
 	function base64ToUTF8(base64) {
-	const bytes = Uint8Array.from(atob(base64), (m) => m.codePointAt(0) || 0);
-	return new TextDecoder().decode(bytes);
+		const bytes = Uint8Array.from(atob(base64), (m) => m.codePointAt(0) || 0);
+		return new TextDecoder().decode(bytes);
 	}
 
 	const scrollYKey = "__kiruna_internal__devScrollY";
@@ -123,10 +130,11 @@ const refreshScriptFmt = `
 		}, 150);
 	}
 
-	const es = new EventSource("http://localhost:%d/events");
+	const ws = new WebSocket("ws://localhost:%d/events");
 
-	es.onmessage = (e) => {
+	ws.onmessage = (e) => {
 		const { changeType, criticalCSS, normalCSSURL, at } = JSON.parse(e.data);
+
 		if (changeType == "rebuilding") {
 			console.log("KIRUNA DEV: Rebuilding server...");
 			const el = document.createElement("div");
@@ -153,6 +161,7 @@ const refreshScriptFmt = `
 				el.style.opacity = "1";
 			}, 10);
 		}
+
 		if (changeType == "other") {
 			const scrollY = window.scrollY;
 			if (scrollY > 0) {
@@ -160,6 +169,7 @@ const refreshScriptFmt = `
 			}
 			window.location.reload();
 		}
+
 		if (changeType == "normal") {
 			const oldLink = document.getElementById("__normal-css");
 			const newLink = document.createElement("link");
@@ -169,6 +179,7 @@ const refreshScriptFmt = `
 			newLink.onload = () => oldLink.remove();
 			oldLink.parentNode.insertBefore(newLink, oldLink.nextSibling);
 		}
+
 		if (changeType == "critical") {
 			const oldStyle = document.getElementById("__critical-css");
 			const newStyle = document.createElement("style");
@@ -176,6 +187,7 @@ const refreshScriptFmt = `
 			newStyle.innerHTML = base64ToUTF8(criticalCSS);
 			document.head.replaceChild(newStyle, oldStyle);
 		}
+			
 		if (changeType == "revalidate") {
 			console.log("KIRUNA DEV: Revalidating...");
 			const el = document.getElementById("__refreshscript-rebuilding");
@@ -191,51 +203,59 @@ const refreshScriptFmt = `
 		}
 	};
 
-	es.addEventListener("error", (e) => {
-		console.log("KIRUNA DEV: SSE error", e);
-		es.close();
+	ws.onerror = (e) => {
+		console.log("KIRUNA DEV: WebSocket error", e);
+		ws.close();
 		window.location.reload();
-	});
+	};
 
 	window.addEventListener("beforeunload", () => {
-		es.close();
+		ws.close();
 	});
 `
 
-func sseHandler(manager *clientManager) http.HandlerFunc {
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all connections
+		return true
+	},
+}
+
+func websocketHandler(manager *clientManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			// __TODO log here?
+			return
+		}
 
 		msg := make(chan refreshFilePayload, 1)
-		client := &client{id: r.RemoteAddr, notify: msg}
+		client := &client{id: r.RemoteAddr, conn: conn, notify: msg}
 		manager.register <- client
 
 		defer func() {
 			manager.unregister <- client
 		}()
 
+		// Read loop to handle client messages (if needed)
 		go func() {
-			<-r.Context().Done()
-			manager.unregister <- client
+			defer conn.Close()
+			for {
+				_, _, err := conn.ReadMessage()
+				if err != nil {
+					manager.unregister <- client
+					break
+				}
+			}
 		}()
 
-		for {
-			select {
-			case m := <-msg:
-				// encode as json
-				json := fmt.Sprintf(
-					`{"changeType": "%s", "criticalCSS": "%s", "normalCSSURL": "%s", "at": "%s"}`,
-					m.ChangeType,
-					m.CriticalCSS,
-					m.NormalCSSURL,
-					m.At.Format(time.RFC3339),
-				)
-				fmt.Fprintf(w, "data: %s\n\n", json)
-				w.(http.Flusher).Flush()
-			case <-r.Context().Done():
-				return
+		// Write loop to send messages to client
+		for m := range msg {
+			err := conn.WriteJSON(m)
+			if err != nil {
+				break
 			}
 		}
 	}
