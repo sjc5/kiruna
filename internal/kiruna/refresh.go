@@ -203,6 +203,11 @@ const refreshScriptFmt = `
 		}
 	};
 
+	ws.onclose = () => {
+		console.log("KIRUNA DEV: WebSocket closed");
+		window.location.reload();
+	};
+
 	ws.onerror = (e) => {
 		console.log("KIRUNA DEV: WebSocket error", e);
 		ws.close();
