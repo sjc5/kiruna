@@ -215,6 +215,7 @@ const refreshScriptFmt = `
 	};
 
 	window.addEventListener("beforeunload", () => {
+		ws.onclose = () => {};
 		ws.close();
 	});
 `

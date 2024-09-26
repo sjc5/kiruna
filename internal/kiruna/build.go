@@ -11,23 +11,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sjc5/kit/pkg/errutil"
 	"github.com/sjc5/kit/pkg/fsutil"
 	"github.com/sjc5/kit/pkg/typed"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
 var noHashPublicDirsByVersion = map[uint8]string{0: "__nohash", 1: "prehashed"}
-
-type precompileError struct {
-	task string
-	err  error
-}
-
-func (e precompileError) Error() string {
-	return fmt.Sprintf("error during precompile task %s: %v", e.task, e.err)
-}
 
 func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	cleanRootDir := c.getCleanRootDir()
@@ -49,11 +42,8 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 		}
 
 		// re-make required directories
-		isServerOnly := c.DevConfig != nil && c.DevConfig.ServerOnly
-		if !isServerOnly {
-			if err := SetupDistDir(c.RootDir); err != nil {
-				return fmt.Errorf("error making requisite directories: %v", err)
-			}
+		if err := SetupDistDir(c.RootDir); err != nil {
+			return fmt.Errorf("error making requisite directories: %v", err)
 		}
 
 		// add pid file back
@@ -64,45 +54,27 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 		}
 	}
 
-	// Must be complete before BuildCSS in case the CSS references any public files
-	if err := c.handlePublicFiles(shouldBeGranular); err != nil {
-		return fmt.Errorf("error handling public files: %v", err)
-	}
+	isServerOnly := c.DevConfig != nil && c.DevConfig.ServerOnly
 
-	// Concurrently execute tasks
-	var wg sync.WaitGroup
-	errChan := make(chan error, 2) // Buffer to hold up to 2 errors
-	wg.Add(2)                      // Two tasks to do concurrently
-
-	// goroutine 1
-	go func() {
-		defer wg.Done()
-		if err := c.copyPrivateFiles(shouldBeGranular); err != nil {
-			errChan <- precompileError{task: "copyPrivateFiles", err: err}
-		}
-	}()
-
-	// goroutine 2
-	go func() {
-		defer wg.Done()
-		if err := c.buildCSS(); err != nil {
-			errChan <- precompileError{task: "BuildCSS", err: err}
-		}
-	}()
-
-	// Wait for all tasks to complete
-	wg.Wait()
-	close(errChan)
-
-	var combinedErrors []error
-	for e := range errChan {
-		if e != nil {
-			combinedErrors = append(combinedErrors, e)
+	if !isServerOnly {
+		// Must be complete before BuildCSS in case the CSS references any public files
+		if err := c.handlePublicFiles(shouldBeGranular); err != nil {
+			return fmt.Errorf("error handling public files: %v", err)
 		}
 	}
 
-	if len(combinedErrors) > 0 {
-		return fmt.Errorf("multiple errors: %v", combinedErrors)
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return errutil.Maybe("error during precompile task (copyPrivateFiles)", c.copyPrivateFiles(shouldBeGranular))
+	})
+	eg.Go(func() error {
+		if isServerOnly {
+			return nil
+		}
+		return errutil.Maybe("error during precompile task (buildCSS)", c.buildCSS())
+	})
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	if recompileBinary {

@@ -5,7 +5,7 @@
 
 <img src="/banner.webp" alt="Kiruna logo banner">
 
-Kiruna is a powerful development server and production build tool for developing and deploying full-stack Go applications. You can think of it as sort of a Vite alternative for the Go ecosystem.
+Kiruna is a simple, powerful library for building and bundling fullstack Go application assets, with live browser refresh and excellent dev-prod parity. It's sort of like Vite, but for apps with Go backends.
 
 ### Dev server features
 
@@ -153,7 +153,7 @@ func main() {
 	})
 
 	// Serve static files from "dist/kiruna/static/public" directory, accessible at "/public/"
-	http.Handle("/public/", platform.Kiruna.GetServeStaticHandler("/public/", true))
+	http.Handle("/public/", platform.Kiruna.MustGetServeStaticHandler("/public/", true))
 
 	// Serve an HTML file using html/template
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -299,17 +299,13 @@ If desired, you can bootstrap a new `.gitignore` file by running the following:
 echo "dist/*\n\!dist/dist.go" > .gitignore
 ```
 
-## Open source / closed contribution
-
-For simplicity and reduced support load, especially while Kiruna is in active early development, Kiruna is currently open source / closed contribution. This may change in the future, but no promises.
-
 ## Alternatives
 
 If you're just looking for automatic Go application rebuilds only, without automatic browser refreshes or static asset build tooling, then Kiruna may be overkill for you, and you could just use <a href="https://github.com/cosmtrek/air" target="_blank">Air</a> instead.
 
-That said, you can put Kiruna into a simpler `ServerOnly` mode if you want. This will disable all of the CSS and static asset build tooling, and it will only do automatic Go application rebuilds _a la_ Air.
+That said, you can put Kiruna into a simpler `ServerOnly` mode if you want, which skips the frontend-targeted build steps and just does automatic Go application rebuilds.
 
-In either case, one benefit of Kiruna over Air is that it doesn't require you to install any tooling on your machine. It is orchestrated solely from inside your repo and its dependencies. So when a new developer joins your team, they can just clone your repo and be ready to rock as soon as they run `go mod tidy` (instead of needing to install and configure Air first).
+In either case, one benefit of Kiruna over Air is that it doesn't require you to install any tooling on your machine. It is orchestrated solely from inside your repo and its dependencies. So when a new developer joins your team, they can just clone your repo and be ready to rock as soon as they run `go mod tidy` (instead of needing to install and configure Air on their machine first).
 
 ## Copyright and License
 
