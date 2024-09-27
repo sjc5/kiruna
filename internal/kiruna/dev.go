@@ -270,10 +270,10 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 		}
 		c.Logger.Infof("restarting app")
 		c.mustStartAppDev()
-		return
 	}
 
 	if hasMultipleEvents {
+		c.Logger.Infof("hard reloading browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeOther})
 	}
 }
