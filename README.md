@@ -5,7 +5,7 @@
 
 <img src="/banner.webp" alt="Kiruna logo banner">
 
-Kiruna is a simple, powerful library for building and bundling fullstack Go application assets, with live browser refresh and excellent dev-prod parity. It's sort of like Vite, but for apps with Go backends.
+Kiruna is a simple, powerful library for building and bundling fullstack Go application assets, with live browser refresh and excellent dev-prod parity. It's sort of like Vite, but for Go apps.
 
 ### Dev server features
 
