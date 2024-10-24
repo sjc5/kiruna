@@ -47,7 +47,7 @@ func (c *Config) RuntimeInitOnce() {
 			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, getIsDev),
 
 			// Public URLs
-			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGob, getIsDev),
+			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGobRuntime, getIsDev),
 			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, getIsDev),
 			publicFileMapDetails: safecache.New(c.getInitialPublicFileMapDetails, getIsDev),
 			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, func(string) bool { return getIsDev() }),

@@ -63,7 +63,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, getIsDev),
 		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, getIsDev),
 		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, getIsDev),
-		publicFileMapFromGob:  safecache.New(config.getInitialPublicFileMapFromGob, nil),
+		publicFileMapFromGob:  safecache.New(config.getInitialPublicFileMapFromGobRuntime, nil),
 		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, getIsDev),
 		publicURLs:            safecache.NewMap(config.getInitialPublicURL, publicURLsKeyMaker, nil),
 	}

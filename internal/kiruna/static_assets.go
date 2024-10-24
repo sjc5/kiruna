@@ -24,8 +24,12 @@ func (c *Config) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeade
 	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS))), nil
 }
 
-func (c *Config) getInitialPublicFileMapFromGob() (map[string]string, error) {
-	return c.loadMapFromGob(PublicFileMapGobName)
+func (c *Config) getInitialPublicFileMapFromGobBuildtime() (map[string]string, error) {
+	return c.loadMapFromGob(PublicFileMapGobName, true)
+}
+
+func (c *Config) getInitialPublicFileMapFromGobRuntime() (map[string]string, error) {
+	return c.loadMapFromGob(PublicFileMapGobName, false)
 }
 
 func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {

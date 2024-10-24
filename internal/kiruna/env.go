@@ -55,15 +55,3 @@ func setModeToDev() {
 func setRefreshServerPort(port int) {
 	os.Setenv(refreshServerPortKey, fmt.Sprintf("%d", port))
 }
-
-func setIsBuildTime(val bool) {
-	if val {
-		os.Setenv(isBuildTimeKey, trueStr)
-	} else {
-		os.Setenv(isBuildTimeKey, "")
-	}
-}
-
-func getIsBuildTime() bool {
-	return os.Getenv(isBuildTimeKey) == trueStr
-}

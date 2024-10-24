@@ -101,9 +101,6 @@ func (c *Config) buildCSS() error {
 
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func (c *Config) processCSS(subDir string) error {
-	setIsBuildTime(true)
-	defer setIsBuildTime(false)
-
 	cleanRootDir := c.getCleanRootDir()
 
 	dirPath := filepath.Join(cleanRootDir, stylesDir, subDir)
@@ -262,9 +259,6 @@ type fileInfo struct {
 }
 
 func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
-	setIsBuildTime(true)
-	defer setIsBuildTime(false)
-
 	cleanRootDir := c.getCleanRootDir()
 	srcDir := filepath.Join(cleanRootDir, staticDir, opts.dirName)
 	distDir := filepath.Join(cleanRootDir, distKirunaDir, staticDir, opts.dirName)
@@ -279,7 +273,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	// Load old file map if granular updates are enabled
 	if opts.shouldBeGranular {
 		var err error
-		oldMap, err := c.loadMapFromGob(opts.mapName)
+		oldMap, err := c.loadMapFromGob(opts.mapName, true)
 		if err != nil {
 			return fmt.Errorf("error reading old file map: %v", err)
 		}

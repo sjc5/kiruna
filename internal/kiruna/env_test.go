@@ -56,21 +56,3 @@ func TestRefreshServerPort(t *testing.T) {
 		t.Errorf("getRefreshServerPort() = %v, want %v", got, 3000)
 	}
 }
-
-func TestBuildTimeFunctions(t *testing.T) {
-	resetEnv()
-
-	if getIsBuildTime() {
-		t.Errorf("getIsBuildTime() = true, want false before setting")
-	}
-
-	setIsBuildTime(true)
-	if !getIsBuildTime() {
-		t.Errorf("getIsBuildTime() = false, want true after setting")
-	}
-
-	setIsBuildTime(false)
-	if getIsBuildTime() {
-		t.Errorf("getIsBuildTime() = true, want false after unsetting")
-	}
-}

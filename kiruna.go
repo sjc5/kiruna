@@ -83,8 +83,8 @@ func (k Kiruna) MustGetServeStaticHandler(pathPrefix string, addImmutableCacheHe
 func (k Kiruna) GetPublicFileMap() (map[string]string, error) {
 	return k.c.GetPublicFileMap()
 }
-func (k Kiruna) GetPublicFileMapKeys(excludedPrefixes []string) ([]string, error) {
-	return k.c.GetPublicFileMapKeys(excludedPrefixes)
+func (k Kiruna) GetPublicFileMapKeysBuildtime(excludedPrefixes []string) ([]string, error) {
+	return k.c.GetPublicFileMapKeysBuildtime(excludedPrefixes)
 }
 func (k Kiruna) GetPublicFileMapElements() template.HTML {
 	return k.c.GetPublicFileMapElements()

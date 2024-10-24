@@ -19,20 +19,14 @@ const (
 	PrivateFileMapGobName = "private_filemap.gob"
 )
 
-func (c *Config) loadMapFromGob(gobFileName string) (map[string]string, error) {
-	var FS UniversalFS
-	var err error
-	if getIsBuildTime() {
-		FS, err = c.cache.uniDirFS.Get()
-	} else {
-		FS, err = c.GetUniversalFS()
-	}
+func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (map[string]string, error) {
+	fs, err := c.getAppropriateFSMaybeBuildTime(isBuildTime)
 	if err != nil {
 		return nil, fmt.Errorf("error getting FS: %v", err)
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	file, err := FS.Open(filepath.Join(internalDir, gobFileName))
+	file, err := fs.Open(filepath.Join(internalDir, gobFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening file %s: %v", gobFileName, err)
 	}
@@ -45,6 +39,13 @@ func (c *Config) loadMapFromGob(gobFileName string) (map[string]string, error) {
 		return nil, fmt.Errorf("error decoding gob: %v", err)
 	}
 	return mapFromGob, nil
+}
+
+func (c *Config) getAppropriateFSMaybeBuildTime(isBuildTime bool) (UniversalFS, error) {
+	if isBuildTime {
+		return c.cache.uniDirFS.Get()
+	}
+	return c.GetUniversalFS()
 }
 
 func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
@@ -158,8 +159,8 @@ func (c *Config) GetPublicFileMapScriptSha256Hash() string {
 	return details.Sha256Hash
 }
 
-func (c *Config) GetPublicFileMapKeys(excludedPrefixes []string) ([]string, error) {
-	filemap, err := c.GetPublicFileMap()
+func (c *Config) GetPublicFileMapKeysBuildtime(excludedPrefixes []string) ([]string, error) {
+	filemap, err := c.getInitialPublicFileMapFromGobBuildtime()
 	if err != nil {
 		return nil, err
 	}
