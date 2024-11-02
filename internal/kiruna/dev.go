@@ -254,7 +254,7 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 	}
 
 	for _, evtDetails := range relevantFileChanges {
-		c.Logger.Info(evtDetails.evt.String())
+		c.Logger.Infof(evtDetails.evt.String())
 
 		err := c.mustHandleFileChange(evtDetails, hasMultipleEvents)
 		if err != nil {
