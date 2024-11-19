@@ -19,21 +19,24 @@ type Config struct {
 	// with your binary. For simplicity, we recommend using the embedded FS.
 	DistFS fs.FS
 
-	// RootDir is the parent directory of the Kiruna-specific directories
-	// (e.g., "dist", "static" and "styles"). It may be (and probably is)
-	// the same as your project's root, but it doesn't have to be. RootDir
-	// should be set relative your project's root (where you run your dev
-	// and build commands from). For example, if your project's root is also
-	// your RootDir, then RootDir should be set to ".". If RootDir is a
-	// subdirectory of your project's root, then set it accordingly (e.g.,
-	// "./app" or "./kiruna"). We do run filepath.Clean on the RootDir,
-	// so if you leave it blank, it will default to ".".
-	RootDir string
+	// Set this relative to the directory you're running commands from (e.g., "./static/private"). Required.
+	// Must be unique from PublicStaticDir, StylesDir, and DistDir.
+	PrivateStaticDir string
 
-	// Set EntryPoint relative to the RootDir, e.g., "./cmd/app/main.go".
-	// Note that your RootDir may be the same as your project's root, but
-	// it isn't necessarily so. See the RootDir comment for more info.
-	EntryPoint string
+	// Set this relative to the directory you're running commands from (e.g., "./static/public"). Required.
+	// Must be unique from PrivateStaticDir, StylesDir, and DistDir.
+	PublicStaticDir string
+
+	// Set this relative to the directory you're running commands from (e.g., "./styles"). Required.
+	// Must be unique from PrivateStaticDir, PublicStaticDir, and DistDir.
+	StylesDir string
+
+	// Set this relative to the directory you're running commands from (e.g., "./dist"). Required.
+	// Must be unique from PrivateStaticDir, PublicStaticDir, and StylesDir.
+	DistDir string
+
+	// Path to your main.go entry file, relative to the directory you're running commands from (e.g., "./cmd/app/main.go"). Required.
+	MainAppEntry string
 
 	DevConfig *DevConfig
 
@@ -41,6 +44,11 @@ type Config struct {
 }
 
 type DevConfig struct {
+	// WatchRoot is the outermost directory to watch for changes in, and your
+	// dev config watched files will be set relative to this directory. If you
+	// leave it blank, it will default to ".". Set this relative to the directory
+	// you're running commands from.
+	WatchRoot           string
 	HealthcheckEndpoint string // e.g., "/healthz" -- should return 200 OK if healthy -- defaults to "/"
 	WatchedFiles        WatchedFiles
 	IgnorePatterns      IgnorePatterns

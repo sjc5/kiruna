@@ -49,7 +49,9 @@ func (c *Config) getAppropriateFSMaybeBuildTime(isBuildTime bool) (UniversalFS, 
 }
 
 func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
-	file, err := os.Create(filepath.Join(c.getCleanRootDir(), distKirunaDir, internalDir, dest))
+	cleanDirs := c.getCleanDirs()
+
+	file, err := os.Create(filepath.Join(cleanDirs.Dist, distKirunaDir, internalDir, dest))
 	if err != nil {
 		return fmt.Errorf("error creating file: %v", err)
 	}
@@ -68,12 +70,14 @@ func (c *Config) savePublicFileMapJSToInternalPublicDir(mapToSave map[string]str
 
 	hashedFilename := getHashedFilenameFromBytes(bytes, PublicFileMapJSName)
 
-	hashedFileRefPath := filepath.Join(c.getCleanRootDir(), distKirunaDir, internalDir, publicFileMapFileRefFile)
+	cleanDirs := c.getCleanDirs()
+
+	hashedFileRefPath := filepath.Join(cleanDirs.Dist, distKirunaDir, internalDir, publicFileMapFileRefFile)
 	if err := os.WriteFile(hashedFileRefPath, []byte(hashedFilename), 0644); err != nil {
 		return fmt.Errorf("error writing to file: %v", err)
 	}
 
-	return os.WriteFile(filepath.Join(c.getCleanRootDir(), distKirunaDir, staticDir, publicDir, publicInternalDir, hashedFilename), bytes, 0644)
+	return os.WriteFile(filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, publicDir, publicInternalDir, hashedFilename), bytes, 0644)
 }
 
 type publicFileMapDetails struct {

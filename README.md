@@ -87,8 +87,12 @@ import (
 )
 
 var Kiruna = kiruna.New(&kiruna.Config{
-	DistFS:     dist.FS,
-	EntryPoint: "cmd/app/main.go",
+	DistFS:     			dist.FS,
+	MainAppEntry: 		"cmd/app/main.go",
+	PrivateStaticDir: "./static/private",
+	PublicStaticDir:  "./static/public",
+	StylesDir:        "./styles",
+	DistDir:          "./dist",
 })
 ```
 

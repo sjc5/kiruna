@@ -10,15 +10,15 @@ import (
 )
 
 type PIDFile struct {
-	cleanRootDir string
+	cleanDistDir string
 }
 
-func newPIDFile(cleanRootDir string) *PIDFile {
-	return &PIDFile{cleanRootDir: cleanRootDir}
+func newPIDFile(cleanDistDir string) *PIDFile {
+	return &PIDFile{cleanDistDir: cleanDistDir}
 }
 
 func (p *PIDFile) getPIDFileRef() string {
-	return filepath.Join(p.cleanRootDir, distKirunaDir, internalDir, pidFile)
+	return filepath.Join(p.cleanDistDir, distKirunaDir, internalDir, pidFile)
 }
 
 func (p *PIDFile) writePIDFile(pid int) error {
@@ -41,7 +41,8 @@ func (p *PIDFile) deletePIDFile() error {
 }
 
 func (c *Config) killPriorPID() {
-	pidFile := &PIDFile{cleanRootDir: c.getCleanRootDir()}
+	cleanDirs := c.getCleanDirs()
+	pidFile := &PIDFile{cleanDistDir: cleanDirs.Dist}
 	priorPID, err := pidFile.readPIDFile()
 	if err != nil {
 		c.Logger.Errorf("Error reading PID file: %v", err)
@@ -94,11 +95,13 @@ func (c *Config) killPriorPID() {
 }
 
 func (c *Config) writePIDFile(pid int) error {
-	pidFile := newPIDFile(c.getCleanRootDir())
+	cleanDirs := c.getCleanDirs()
+	pidFile := newPIDFile(cleanDirs.Dist)
 	return pidFile.writePIDFile(pid)
 }
 
 func (c *Config) deletePIDFile() error {
-	pidFile := newPIDFile(c.getCleanRootDir())
+	cleanDirs := c.getCleanDirs()
+	pidFile := newPIDFile(cleanDirs.Dist)
 	return pidFile.deletePIDFile()
 }

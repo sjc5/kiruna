@@ -9,10 +9,9 @@ import (
 )
 
 func (c *Config) compileBinary() error {
-	cleanRootDir := c.getCleanRootDir()
-	buildDest := filepath.Join(cleanRootDir, binOutPath)
-	entryPoint := filepath.Join(cleanRootDir, c.EntryPoint)
-	buildCmd := exec.Command("go", "build", "-o", buildDest, entryPoint)
+	cleanDirs := c.getCleanDirs()
+	buildDest := filepath.Join(cleanDirs.Dist, binOutPath)
+	buildCmd := exec.Command("go", "build", "-o", buildDest, c.MainAppEntry)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	a := time.Now()

@@ -23,26 +23,26 @@ import (
 var noHashPublicDirsByVersion = map[uint8]string{0: "__nohash", 1: "prehashed"}
 
 func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
-	cleanRootDir := c.getCleanRootDir()
+	cleanDirs := c.getCleanDirs()
 
 	c.fileSemaphore = semaphore.NewWeighted(100)
 
 	if !shouldBeGranular {
 
 		// check for existing PID file
-		pidFile := PIDFile{cleanRootDir: cleanRootDir}
+		pidFile := PIDFile{cleanDistDir: cleanDirs.Dist}
 		lastPID, err := pidFile.readPIDFile()
 		if err != nil {
 			return fmt.Errorf("error reading PID file: %v", err)
 		}
 
 		// nuke the dist/kiruna directory
-		if err := os.RemoveAll(filepath.Join(cleanRootDir, distKirunaDir)); err != nil {
+		if err := os.RemoveAll(filepath.Join(cleanDirs.Dist, distKirunaDir)); err != nil {
 			return fmt.Errorf("error removing dist/kiruna directory: %v", err)
 		}
 
 		// re-make required directories
-		if err := SetupDistDir(c.RootDir); err != nil {
+		if err := SetupDistDir(cleanDirs.Dist); err != nil {
 			return fmt.Errorf("error making requisite directories: %v", err)
 		}
 
@@ -101,9 +101,9 @@ func (c *Config) buildCSS() error {
 
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func (c *Config) processCSS(subDir string) error {
-	cleanRootDir := c.getCleanRootDir()
+	cleanDirs := c.getCleanDirs()
 
-	dirPath := filepath.Join(cleanRootDir, stylesDir, subDir)
+	dirPath := filepath.Join(cleanDirs.Styles, subDir)
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		return nil
 	}
@@ -160,9 +160,9 @@ func (c *Config) processCSS(subDir string) error {
 
 	switch subDir {
 	case "critical":
-		outputPath = filepath.Join(cleanRootDir, distKirunaDir, internalDir)
+		outputPath = filepath.Join(cleanDirs.Dist, distKirunaDir, internalDir)
 	case "normal":
-		outputPath = filepath.Join(cleanRootDir, distKirunaDir, staticDir, publicDir)
+		outputPath = filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, publicDir)
 	}
 
 	outputFileName := subDir + ".css" // Default for 'critical'
@@ -194,7 +194,7 @@ func (c *Config) processCSS(subDir string) error {
 
 	// If normal, also write to a file called normal_css_ref.txt with the hash
 	if subDir == "normal" {
-		hashFile := filepath.Join(cleanRootDir, distKirunaDir, internalDir, normalCSSFileRefFile)
+		hashFile := filepath.Join(cleanDirs.Dist, distKirunaDir, internalDir, normalCSSFileRefFile)
 		if err := os.WriteFile(hashFile, []byte(outputFileName), 0644); err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
@@ -216,6 +216,8 @@ func (c *Config) processCSS(subDir string) error {
 
 type staticFileProcessorOpts struct {
 	dirName          string
+	srcDir           string
+	distDir          string
 	mapName          string
 	shouldBeGranular bool
 	getIsNoHashDir   func(string) (bool, uint8)
@@ -223,8 +225,12 @@ type staticFileProcessorOpts struct {
 }
 
 func (c *Config) handlePublicFiles(shouldBeGranular bool) error {
+	cleanDirs := c.getCleanDirs()
+
 	return c.processStaticFiles(&staticFileProcessorOpts{
 		dirName:          publicDir,
+		srcDir:           cleanDirs.PublicStatic,
+		distDir:          filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, publicDir),
 		mapName:          PublicFileMapGobName,
 		shouldBeGranular: shouldBeGranular,
 		getIsNoHashDir: func(path string) (bool, uint8) {
@@ -241,8 +247,12 @@ func (c *Config) handlePublicFiles(shouldBeGranular bool) error {
 }
 
 func (c *Config) copyPrivateFiles(shouldBeGranular bool) error {
+	cleanDirs := c.getCleanDirs()
+
 	return c.processStaticFiles(&staticFileProcessorOpts{
 		dirName:          privateDir,
+		srcDir:           cleanDirs.PrivateStatic,
+		distDir:          filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, privateDir),
 		mapName:          PrivateFileMapGobName,
 		shouldBeGranular: shouldBeGranular,
 		getIsNoHashDir: func(path string) (bool, uint8) {
@@ -259,11 +269,7 @@ type fileInfo struct {
 }
 
 func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
-	cleanRootDir := c.getCleanRootDir()
-	srcDir := filepath.Join(cleanRootDir, staticDir, opts.dirName)
-	distDir := filepath.Join(cleanRootDir, distKirunaDir, staticDir, opts.dirName)
-
-	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
+	if _, err := os.Stat(opts.srcDir); os.IsNotExist(err) {
 		return nil
 	}
 
@@ -289,12 +295,12 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	// File discovery goroutine
 	go func() {
 		defer close(fileChan)
-		err := filepath.WalkDir(srcDir, func(path string, d fs.DirEntry, err error) error {
+		err := filepath.WalkDir(opts.srcDir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 			if !d.IsDir() {
-				relativePath, err := filepath.Rel(srcDir, path)
+				relativePath, err := filepath.Rel(opts.srcDir, path)
 				if err != nil {
 					return err
 				}
@@ -319,7 +325,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		go func() {
 			defer wg.Done()
 			for fi := range fileChan {
-				if err := c.processFile(fi, opts, &newFileMap, &oldFileMap, distDir); err != nil {
+				if err := c.processFile(fi, opts, &newFileMap, &oldFileMap, opts.distDir); err != nil {
 					errChan <- err
 					return
 				}
@@ -341,7 +347,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		var oldMapErr error
 		oldFileMap.Range(func(k, v string) bool {
 			if newHash, exists := newFileMap.Load(k); !exists || newHash != v {
-				oldDistPath := filepath.Join(distDir, v)
+				oldDistPath := filepath.Join(opts.distDir, v)
 				err := os.Remove(oldDistPath)
 				if err != nil && !os.IsNotExist(err) {
 					oldMapErr = fmt.Errorf("error removing old static file from dist (%s/%s): %v", opts.dirName, v, err)
@@ -426,7 +432,7 @@ func (c *Config) ResolveCSSURLFuncArgs(css string) string {
 		rawUrl := urlRegex.FindStringSubmatch(match)[1]
 		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
 		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
-			hashedUrl, _ := c.getInitialPublicURL(cleanedUrl)
+			hashedUrl, _ := c.getPublicURLBuildtime(cleanedUrl)
 			return fmt.Sprintf("url(%s)", hashedUrl)
 		} else {
 			return match // Leave external URLs unchanged

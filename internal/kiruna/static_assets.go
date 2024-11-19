@@ -32,15 +32,29 @@ func (c *Config) getInitialPublicFileMapFromGobRuntime() (map[string]string, err
 	return c.loadMapFromGob(PublicFileMapGobName, false)
 }
 
-func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
-	if strings.HasPrefix(originalPublicURL, "data:") {
-		return originalPublicURL, nil
+func (c *Config) getPublicURLBuildtime(originalPublicURL string) (string, error) {
+	fileMapFromGob, err := c.getInitialPublicFileMapFromGobBuildtime()
+	if err != nil {
+		c.Logger.Errorf("error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err)
+		return "/" + publicDir + "/" + originalPublicURL, err
 	}
 
+	return c.getInitialPublicURLInner(originalPublicURL, fileMapFromGob)
+}
+
+func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
 	fileMapFromGob, err := c.cache.publicFileMapFromGob.Get()
 	if err != nil {
-		c.Logger.Errorf("error getting public file map from gob: %v", err)
-		return originalPublicURL, err
+		c.Logger.Errorf("error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err)
+		return "/" + publicDir + "/" + originalPublicURL, err
+	}
+
+	return c.getInitialPublicURLInner(originalPublicURL, fileMapFromGob)
+}
+
+func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromGob map[string]string) (string, error) {
+	if strings.HasPrefix(originalPublicURL, "data:") {
+		return originalPublicURL, nil
 	}
 
 	if hashedURL, existsInFileMap := fileMapFromGob[cleanURL(originalPublicURL)]; existsInFileMap {

@@ -32,6 +32,28 @@ type runtimeCache struct {
 }
 
 func (c *Config) RuntimeInitOnce() {
+	if c.PrivateStaticDir == "" {
+		panic("kiruna.Config.PrivateStaticDir is required")
+	}
+	if c.PublicStaticDir == "" {
+		panic("kiruna.Config.PublicStaticDir is required")
+	}
+	if c.StylesDir == "" {
+		panic("kiruna.Config.StylesDir is required")
+	}
+	if c.DistDir == "" {
+		panic("kiruna.Config.DistDir is required")
+	}
+
+	var seenDirs = make(map[string]bool)
+
+	for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.StylesDir, c.DistDir} {
+		if seenDirs[dir] {
+			panic("duplicate dir: " + dir + " in kiruna.Config. PrivateStaticDir, PublicStaticDir, StylesDir, and DistDir must all be unique")
+		}
+		seenDirs[dir] = true
+	}
+
 	c.runtime.initOnce.Do(func() {
 		// cache
 		c.cache = runtimeCache{

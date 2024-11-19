@@ -8,25 +8,25 @@ import (
 
 func (c *Config) mustSetupWatcher() {
 	defer c.mustKillAppDev()
-	cleanRootDir := c.getCleanRootDir()
+	cleanWatchRoot := c.getCleanWatchRoot()
 
 	// Loop through all WatchedFiles...
 	for i, wfc := range c.DevConfig.WatchedFiles {
-		// and make each WatchedFile's Pattern relative to cleanRootDir...
-		c.DevConfig.WatchedFiles[i].Pattern = filepath.Join(cleanRootDir, wfc.Pattern)
+		// and make each WatchedFile's Pattern relative to cleanWatchRoot...
+		c.DevConfig.WatchedFiles[i].Pattern = filepath.Join(cleanWatchRoot, wfc.Pattern)
 
 		// then loop through such WatchedFile's OnChangeCallbacks...
 		for j, oc := range wfc.OnChangeCallbacks {
-			// and make each such OnChangeCallback's ExcludedPatterns also relative to cleanRootDir
+			// and make each such OnChangeCallback's ExcludedPatterns also relative to cleanWatchRoot
 			for k, p := range oc.ExcludedPatterns {
-				c.DevConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(cleanRootDir, p)
+				c.DevConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(cleanWatchRoot, p)
 			}
 		}
 	}
 
 	defer c.watcher.Close()
 
-	err := c.addDirs(c.getCleanRootDir())
+	err := c.addDirs(cleanWatchRoot)
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to add directories to watcher: %v", err)
 		c.Logger.Error(errMsg)

@@ -43,9 +43,12 @@ func setupTestEnv(t *testing.T) *testEnv {
 	}
 
 	config := &Config{
-		RootDir:    testRootDir,
-		EntryPoint: "cmd/app/main.go",
-		Logger:     &colorlog.Log{},
+		PrivateStaticDir: filepath.Join(testRootDir, "static", "private"),
+		PublicStaticDir:  filepath.Join(testRootDir, "static", "public"),
+		StylesDir:        filepath.Join(testRootDir, "styles"),
+		DistDir:          filepath.Join(testRootDir, "dist"),
+		MainAppEntry:     "cmd/app/main.go",
+		Logger:           &colorlog.Log{},
 	}
 
 	// Initialize the fileSemaphore

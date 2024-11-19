@@ -14,7 +14,7 @@ func TestPIDFile(t *testing.T) {
 	env := setupTestEnv(t)
 	defer teardownTestEnv(t)
 
-	pidFile := newPIDFile(env.config.getCleanRootDir())
+	pidFile := newPIDFile(env.config.getCleanDirs().Dist)
 
 	t.Run("WritePIDFile", func(t *testing.T) {
 		testPID := 12345
@@ -93,7 +93,7 @@ func TestConfigPIDMethods(t *testing.T) {
 			t.Fatalf("writePIDFile() error = %v", err)
 		}
 
-		pidFile := newPIDFile(env.config.getCleanRootDir())
+		pidFile := newPIDFile(env.config.getCleanDirs().Dist)
 		content, err := os.ReadFile(pidFile.getPIDFileRef())
 		if err != nil {
 			t.Fatalf("Failed to read PID file: %v", err)
@@ -115,7 +115,7 @@ func TestConfigPIDMethods(t *testing.T) {
 			t.Fatalf("deletePIDFile() error = %v", err)
 		}
 
-		pidFile := newPIDFile(env.config.getCleanRootDir())
+		pidFile := newPIDFile(env.config.getCleanDirs().Dist)
 		_, err = os.Stat(pidFile.getPIDFileRef())
 		if !os.IsNotExist(err) {
 			t.Errorf("PID file still exists after deletion")
@@ -137,7 +137,7 @@ func TestKillPriorPID(t *testing.T) {
 	pid := cmd.Process.Pid
 
 	// Write the PID to the file
-	pidFile := newPIDFile(env.config.getCleanRootDir())
+	pidFile := newPIDFile(env.config.getCleanDirs().Dist)
 	err = pidFile.writePIDFile(pid)
 	if err != nil {
 		t.Fatalf("Failed to write PID file: %v", err)
@@ -173,9 +173,9 @@ func TestPIDFileLocation(t *testing.T) {
 	env := setupTestEnv(t)
 	defer teardownTestEnv(t)
 
-	pidFile_ := newPIDFile(env.config.getCleanRootDir())
+	pidFile_ := newPIDFile(env.config.getCleanDirs().Dist)
 
-	expectedLocation := filepath.Join(env.config.getCleanRootDir(), distKirunaDir, internalDir, pidFile)
+	expectedLocation := filepath.Join(env.config.getCleanDirs().Dist, distKirunaDir, internalDir, pidFile)
 	actualLocation := pidFile_.getPIDFileRef()
 
 	if actualLocation != expectedLocation {

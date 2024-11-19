@@ -87,9 +87,8 @@ func (c *Config) getIsEmptyFile(evt fsnotify.Event) bool {
 }
 
 func (c *Config) getIsCssEvtType(evt fsnotify.Event, cssType changeType) bool {
-	return strings.HasPrefix(
-		evt.Name, filepath.Join(c.getCleanRootDir(), stylesDir, string(cssType)),
-	)
+	cleanDirs := c.getCleanDirs()
+	return strings.HasPrefix(evt.Name, filepath.Join(cleanDirs.Styles, string(cssType)))
 }
 
 func (c *Config) getIsNonEmptyCHMODOnly(evt fsnotify.Event) bool {

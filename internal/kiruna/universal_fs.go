@@ -47,9 +47,9 @@ func (c *Config) getIsUsingEmbeddedFS() bool {
 }
 
 func (c *Config) getInitialUniversalDirFS() (UniversalFS, error) {
-	return &universalFS{
-		FS: os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)),
-	}, nil
+	cleanDirs := c.getCleanDirs()
+	fs := &universalFS{FS: os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir))}
+	return fs, nil
 }
 
 func (c *Config) getFS(subDir string) (UniversalFS, error) {
@@ -88,20 +88,26 @@ func (c *Config) GetUniversalFS() (UniversalFS, error) {
 // GetUniversalFS returns a filesystem interface that works across different environments (dev/prod)
 // and supports both embedded and non-embedded filesystems.
 func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
+	useVerboseLogs := getUseVerboseLogs()
+
 	// DEV
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
 	if getIsDev() {
-		c.Logger.Infof("using disk filesystem (dev)")
+		if useVerboseLogs {
+			c.Logger.Infof("using disk filesystem (dev)")
+		}
 
-		return &universalFS{
-			FS: os.DirFS(path.Join(c.getCleanRootDir(), distKirunaDir)),
-		}, nil
+		cleanDirs := c.getCleanDirs()
+		fs := &universalFS{FS: os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir))}
+		return fs, nil
 	}
 
 	// If we are using the embedded file system, we should use the dist file system
 	if c.getIsUsingEmbeddedFS() {
-		c.Logger.Infof("using embedded filesystem (prod)")
+		if useVerboseLogs {
+			c.Logger.Infof("using embedded filesystem (prod)")
+		}
 
 		// Assuming the embed directive looks like this:
 		// //go:embed kiruna
@@ -115,7 +121,9 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 		return &universalFS{FS: FS}, nil
 	}
 
-	c.Logger.Infof("using disk filesystem (prod)")
+	if useVerboseLogs {
+		c.Logger.Infof("using disk filesystem (prod)")
+	}
 
 	// If we are not using the embedded file system, we should use the os file system,
 	// and assume that the executable is a sibling to the kiruna-outputted "kiruna" directory
