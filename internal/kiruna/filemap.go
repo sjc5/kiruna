@@ -133,14 +133,14 @@ func (c *Config) getInitialPublicFileMapDetails() (*publicFileMapDetails, error)
 func (c *Config) getInitialPublicFileMapURL() (string, error) {
 	fs, err := c.GetUniversalFS()
 	if err != nil {
-		c.Logger.Errorf("error getting FS: %v", err)
+		c.Logger.Error(fmt.Sprintf("error getting FS: %v", err))
 		return "", err
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	content, err := fs.ReadFile(filepath.Join(internalDir, publicFileMapFileRefFile))
 	if err != nil {
-		c.Logger.Errorf("error reading publicFileMapFileRefFile: %v", err)
+		c.Logger.Error(fmt.Sprintf("error reading publicFileMapFileRefFile: %v", err))
 		return "", err
 	}
 

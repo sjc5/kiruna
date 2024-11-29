@@ -19,7 +19,7 @@ const (
 	useVerboseLogsKey    = "KIRUNA_USE_VERBOSE_LOGS"
 )
 
-func getIsDev() bool {
+func GetIsDev() bool {
 	return os.Getenv(modeKey) == devModeVal
 }
 

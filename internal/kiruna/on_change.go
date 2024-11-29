@@ -1,6 +1,8 @@
 package ik
 
 import (
+	"fmt"
+
 	"golang.org/x/sync/errgroup"
 )
 
@@ -61,7 +63,7 @@ func (c *Config) runConcurrentOnChangeCallbacks(onChanges *[]OnChange, evtName s
 			eg.Go(func() error {
 				err := o.Func(evtName)
 				if err != nil {
-					c.Logger.Errorf("error running extension callback: %v", err)
+					c.Logger.Error(fmt.Sprintf("error running extension callback: %v", err))
 					return err
 				}
 				return nil
@@ -90,7 +92,7 @@ func (c *Config) simpleRunOnChangeCallbacks(onChanges *[]OnChange, evtName strin
 		}
 		err := o.Func(evtName)
 		if err != nil {
-			c.Logger.Errorf("error running extension callback: %v", err)
+			c.Logger.Error(fmt.Sprintf("error running extension callback: %v", err))
 			return err
 		}
 	}

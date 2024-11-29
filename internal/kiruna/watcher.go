@@ -37,7 +37,7 @@ func (c *Config) mustSetupWatcher() {
 		c.mustKillAppDev()
 		err := c.compileBinary()
 		if err != nil {
-			c.Logger.Errorf("error: failed to build app: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to build app: %v", err))
 		}
 		c.mustStartAppDev()
 		c.mustHandleWatcherEmissions()

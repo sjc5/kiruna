@@ -1,6 +1,7 @@
 package ik
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -20,7 +21,7 @@ func (c *Config) getInitialMatchResults(k potentialMatch) (bool, error) {
 
 	matches, err := doublestar.Match(k.pattern, normalizedPath)
 	if err != nil {
-		c.Logger.Errorf("error: failed to match file: %v", err)
+		c.Logger.Error(fmt.Sprintf("error: failed to match file: %v", err))
 		return false, err
 	}
 

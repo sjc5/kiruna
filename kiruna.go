@@ -101,7 +101,7 @@ func (k Kiruna) ResolveCSSURLFuncArgs(css string) string {
 
 func New(c *ik.Config) *Kiruna {
 	if c.Logger == nil {
-		c.Logger = &colorlog.Log{Label: "Kiruna"}
+		c.Logger = colorlog.New("Kiruna")
 	}
 	c.RuntimeInitOnce()
 	return &Kiruna{c}
@@ -121,3 +121,4 @@ const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
 
 var SetupDistDir = ik.SetupDistDir
 var MustGetPort = ik.MustGetPort
+var GetIsDev = ik.GetIsDev

@@ -90,7 +90,7 @@ func (c *Config) mustReloadBroadcast(rfp refreshFilePayload) {
 }
 
 func (c *Config) GetRefreshScriptSha256Hash() string {
-	if !getIsDev() {
+	if !GetIsDev() {
 		return ""
 	}
 	hash := cryptoutil.Sha256Hash([]byte(GetRefreshScriptInner(getRefreshServerPort())))
@@ -98,7 +98,7 @@ func (c *Config) GetRefreshScriptSha256Hash() string {
 }
 
 func (c *Config) GetRefreshScript() template.HTML {
-	if !getIsDev() {
+	if !GetIsDev() {
 		return ""
 	}
 	result, _ := htmlutil.RenderElement(&htmlutil.Element{

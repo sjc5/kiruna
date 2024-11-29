@@ -35,7 +35,9 @@ func (c *Config) getInitialPublicFileMapFromGobRuntime() (map[string]string, err
 func (c *Config) getPublicURLBuildtime(originalPublicURL string) (string, error) {
 	fileMapFromGob, err := c.getInitialPublicFileMapFromGobBuildtime()
 	if err != nil {
-		c.Logger.Errorf("error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err)
+		c.Logger.Error(fmt.Sprintf(
+			"error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err,
+		))
 		return "/" + publicDir + "/" + originalPublicURL, err
 	}
 
@@ -45,7 +47,9 @@ func (c *Config) getPublicURLBuildtime(originalPublicURL string) (string, error)
 func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
 	fileMapFromGob, err := c.cache.publicFileMapFromGob.Get()
 	if err != nil {
-		c.Logger.Errorf("error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err)
+		c.Logger.Error(fmt.Sprintf(
+			"error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err,
+		))
 		return "/" + publicDir + "/" + originalPublicURL, err
 	}
 
@@ -62,10 +66,10 @@ func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromG
 	}
 
 	// If no hashed URL found, return the original URL
-	c.Logger.Infof(
+	c.Logger.Info(fmt.Sprintf(
 		"GetPublicURL: no hashed URL found for %s, returning original URL",
 		originalPublicURL,
-	)
+	))
 
 	return "/" + publicDir + "/" + originalPublicURL, nil
 }

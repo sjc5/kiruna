@@ -54,27 +54,22 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 		}
 	}
 
-	isServerOnly := c.DevConfig != nil && c.DevConfig.ServerOnly
-
-	if !isServerOnly {
+	if !c.ServerOnly {
 		// Must be complete before BuildCSS in case the CSS references any public files
 		if err := c.handlePublicFiles(shouldBeGranular); err != nil {
 			return fmt.Errorf("error handling public files: %v", err)
 		}
-	}
 
-	var eg errgroup.Group
-	eg.Go(func() error {
-		return errutil.Maybe("error during precompile task (copyPrivateFiles)", c.copyPrivateFiles(shouldBeGranular))
-	})
-	eg.Go(func() error {
-		if isServerOnly {
-			return nil
+		var eg errgroup.Group
+		eg.Go(func() error {
+			return errutil.Maybe("error during precompile task (copyPrivateFiles)", c.copyPrivateFiles(shouldBeGranular))
+		})
+		eg.Go(func() error {
+			return errutil.Maybe("error during precompile task (buildCSS)", c.buildCSS())
+		})
+		if err := eg.Wait(); err != nil {
+			return err
 		}
-		return errutil.Maybe("error during precompile task (buildCSS)", c.buildCSS())
-	})
-	if err := eg.Wait(); err != nil {
-		return err
 	}
 
 	if recompileBinary {
@@ -131,14 +126,14 @@ func (c *Config) processCSS(subDir string) error {
 		go func(fn string) {
 			defer wg.Done()
 			if err := c.fileSemaphore.Acquire(context.Background(), 1); err != nil {
-				c.Logger.Errorf("Error acquiring semaphore: %v", err)
+				c.Logger.Error(fmt.Sprintf("error acquiring semaphore: %v", err))
 				return
 			}
 			defer c.fileSemaphore.Release(1)
 
 			content, err := os.ReadFile(filepath.Join(dirPath, fn))
 			if err != nil {
-				c.Logger.Errorf("Error reading file %s: %v", fn, err)
+				c.Logger.Error("error reading file %s: %v", fn, err)
 				return
 			}
 			processedCSS[i] = string(content)
@@ -202,7 +197,7 @@ func (c *Config) processCSS(subDir string) error {
 
 	finalCSS := concatenatedCSSString
 
-	if !getIsDev() {
+	if !GetIsDev() {
 		m := minify.New()
 		m.AddFunc("text/css", css.Minify)
 		finalCSS, err = m.String("text/css", concatenatedCSSString)

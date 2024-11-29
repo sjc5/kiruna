@@ -22,8 +22,8 @@ func TestGetIsDev(t *testing.T) {
 			if tt.envValue != "" {
 				os.Setenv(modeKey, tt.envValue)
 			}
-			if got := getIsDev(); got != tt.want {
-				t.Errorf("getIsDev() = %v, want %v", got, tt.want)
+			if got := GetIsDev(); got != tt.want {
+				t.Errorf("GetIsDev() = %v, want %v", got, tt.want)
 			}
 		})
 	}

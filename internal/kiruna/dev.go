@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/sjc5/kit/pkg/grace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,8 +30,35 @@ func (c *Config) MustStartDev() {
 		panic(errMsg)
 	}
 
+	if c.DistDir == "" {
+		panic("kiruna.Config.DistDir is required")
+	}
+
+	if !c.ServerOnly {
+		if c.PrivateStaticDir == "" {
+			panic("kiruna.Config.PrivateStaticDir is required")
+		}
+		if c.PublicStaticDir == "" {
+			panic("kiruna.Config.PublicStaticDir is required")
+		}
+		if c.StylesDir == "" {
+			panic("kiruna.Config.StylesDir is required")
+		}
+
+		var seenDirs = make(map[string]bool)
+		for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.StylesDir, c.DistDir} {
+			if seenDirs[dir] {
+				panic(fmt.Sprintf(
+					"duplicate dir (%s) in kiruna.Config. PrivateStaticDir, PublicStaticDir, StylesDir, and DistDir must all be unique",
+					dir,
+				))
+			}
+			seenDirs[dir] = true
+		}
+	}
+
 	if len(c.DevConfig.HealthcheckEndpoint) == 0 {
-		c.Logger.Warning(healthCheckWarning)
+		c.Logger.Warn(healthCheckWarning)
 		c.DevConfig.HealthcheckEndpoint = "/"
 	}
 
@@ -52,7 +80,7 @@ func (c *Config) MustStartDev() {
 	if freePort, err := getFreePort(defaultFreePort); err == nil {
 		setRefreshServerPort(freePort)
 	} else {
-		c.Logger.Errorf("error: failed to get free port for refresh server: %v", err)
+		c.Logger.Error(fmt.Sprintf("error: failed to get free port for refresh server: %v", err))
 		panic(err)
 	}
 
@@ -63,12 +91,12 @@ func (c *Config) MustStartDev() {
 		panic(errMsg)
 	}
 
-	if c.DevConfig.ServerOnly {
+	if c.ServerOnly {
 		c.mustSetupWatcher()
 		return
 	}
 
-	c.Logger.Infof("initializing sidecar refresh server on port %d", getRefreshServerPort())
+	c.Logger.Info(fmt.Sprintf("initializing sidecar refresh server on port %d", getRefreshServerPort()))
 
 	go c.manager.start()
 	go c.mustSetupWatcher()
@@ -98,7 +126,7 @@ func (c *Config) mustKillAppDev() {
 	defer c.lastBuildCmd.mu.Unlock()
 
 	if c.lastBuildCmd.v != nil {
-		if err := c.lastBuildCmd.v.Process.Kill(); err != nil {
+		if err := grace.TerminateProcess(c.lastBuildCmd.v.Process, 5*time.Second, c.Logger); err != nil {
 			errMsg := fmt.Sprintf(
 				"error: failed to kill running app with pid %d: %v",
 				c.lastBuildCmd.v.Process.Pid,
@@ -107,10 +135,10 @@ func (c *Config) mustKillAppDev() {
 			c.Logger.Error(errMsg)
 			panic(errMsg)
 		} else {
-			c.Logger.Infof("killed app with pid %d", c.lastBuildCmd.v.Process.Pid)
+			c.Logger.Info(fmt.Sprintf("killed app with pid %d", c.lastBuildCmd.v.Process.Pid))
 
 			if err := c.deletePIDFile(); err != nil {
-				c.Logger.Errorf("error: failed to delete PID file: %v", err)
+				c.Logger.Error(fmt.Sprintf("error: failed to delete PID file: %v", err))
 				// now just move on, not the end of the world
 			}
 
@@ -136,10 +164,10 @@ func (c *Config) mustStartAppDev() {
 		panic(errMsg)
 	}
 
-	c.Logger.Infof("app started with pid %d", c.lastBuildCmd.v.Process.Pid)
+	c.Logger.Info(fmt.Sprintf("app started with pid %d", c.lastBuildCmd.v.Process.Pid))
 
 	if err := c.writePIDFile(c.lastBuildCmd.v.Process.Pid); err != nil {
-		c.Logger.Errorf("error: failed to write PID file: %v", err)
+		c.Logger.Error(fmt.Sprintf("error: failed to write PID file: %v", err))
 		// now just move on, not the end of the world
 	}
 }
@@ -154,7 +182,7 @@ func (c *Config) mustHandleWatcherEmissions() {
 		case evt := <-c.watcher.Events:
 			debouncer.addEvent(evt)
 		case err := <-c.watcher.Errors:
-			c.Logger.Errorf("watcher error: %v", err)
+			c.Logger.Error(fmt.Sprintf("watcher error: %v", err))
 		}
 	}
 }
@@ -175,7 +203,7 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 		if fileInfo != nil && fileInfo.IsDir() {
 			if evt.Has(fsnotify.Create) || evt.Has(fsnotify.Rename) {
 				if err := c.addDirs(evt.Name); err != nil {
-					c.Logger.Errorf("error: failed to add directory to watcher: %v", err)
+					c.Logger.Error(fmt.Sprintf("error: failed to add directory to watcher: %v", err))
 					continue
 				}
 			}
@@ -248,33 +276,33 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 	eg := errgroup.Group{}
 	if hasMultipleEvents && isGoOrNeedsHardReloadEvenIfNonGo {
 		eg.Go(func() error {
-			c.Logger.Infof("killing app")
+			c.Logger.Info("killing app")
 			c.mustKillAppDev()
 			return nil
 		})
 	}
 
 	for _, evtDetails := range relevantFileChanges {
-		c.Logger.Infof(evtDetails.evt.String())
+		c.Logger.Info(evtDetails.evt.String())
 
 		err := c.mustHandleFileChange(evtDetails, hasMultipleEvents)
 		if err != nil {
-			c.Logger.Errorf("error: failed to handle file change: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to handle file change: %v", err))
 			return
 		}
 	}
 
 	if hasMultipleEvents && isGoOrNeedsHardReloadEvenIfNonGo {
 		if err := eg.Wait(); err != nil {
-			c.Logger.Errorf("error: failed to kill app: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to kill app: %v", err))
 			return
 		}
-		c.Logger.Infof("restarting app")
+		c.Logger.Info("restarting app")
 		c.mustStartAppDev()
 	}
 
 	if hasMultipleEvents {
-		c.Logger.Infof("hard reloading browser")
+		c.Logger.Info("hard reloading browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeOther})
 	}
 }
@@ -292,7 +320,7 @@ func (c *Config) mustHandleFileChange(
 		wfc = c.defaultWatchedFile
 	}
 
-	if !c.DevConfig.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS && !isPartOfBatch {
+	if !c.ServerOnly && !wfc.SkipRebuildingNotification && !evtDetails.isKirunaCSS && !isPartOfBatch {
 		c.manager.broadcast <- refreshFilePayload{
 			ChangeType: changeTypeRebuilding,
 		}
@@ -301,7 +329,7 @@ func (c *Config) mustHandleFileChange(
 	needsHardReloadEvenIfNonGo := getNeedsHardReloadEvenIfNonGo(wfc)
 
 	if evtDetails.isGo || wfc.RecompileBinary {
-		c.Logger.Infof("recompiling binary")
+		c.Logger.Info("recompiling binary")
 	}
 
 	needsKillAndRestart := (evtDetails.isGo || needsHardReloadEvenIfNonGo) && !isPartOfBatch
@@ -309,7 +337,7 @@ func (c *Config) mustHandleFileChange(
 	killAndRestartEG := errgroup.Group{}
 	if needsKillAndRestart {
 		killAndRestartEG.Go(func() error {
-			c.Logger.Infof("killing app")
+			c.Logger.Info("killing app")
 			c.mustKillAppDev()
 			return nil
 		})
@@ -326,12 +354,12 @@ func (c *Config) mustHandleFileChange(
 		}()
 
 		if err := c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPre, evtDetails.evt.Name); err != nil {
-			c.Logger.Errorf("error: failed to build: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to build: %v", err))
 			return err
 		}
 
 		if wfc.RunOnChangeOnly {
-			c.Logger.Infof("ran applicable onChange callbacks")
+			c.Logger.Info("ran applicable onChange callbacks")
 			return nil
 		}
 
@@ -341,47 +369,47 @@ func (c *Config) mustHandleFileChange(
 		})
 
 		if err := c.runConcurrentOnChangeCallbacks(&sortedOnChanges.stratConcurrent, evtDetails.evt.Name, true); err != nil {
-			c.Logger.Errorf("error: failed to build: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to build: %v", err))
 			return err
 		}
 
 		if err := eg.Wait(); err != nil {
-			c.Logger.Errorf("error: failed to build: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to build: %v", err))
 			return err
 		}
 	} else {
 		if err := c.callback(wfc, evtDetails); err != nil {
-			c.Logger.Errorf("error: failed to build: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to build: %v", err))
 			return err
 		}
 	}
 
 	if err := c.simpleRunOnChangeCallbacks(&sortedOnChanges.stratPost, evtDetails.evt.Name); err != nil {
-		c.Logger.Errorf("error: failed to build: %v", err)
+		c.Logger.Error(fmt.Sprintf("error: failed to build: %v", err))
 		return err
 	}
 
 	if needsKillAndRestart {
 		if err := killAndRestartEG.Wait(); err != nil {
-			c.Logger.Errorf("error: failed to kill app: %v", err)
+			c.Logger.Error(fmt.Sprintf("error: failed to kill app: %v", err))
 			return err
 		}
-		c.Logger.Infof("restarting app")
+		c.Logger.Info("restarting app")
 		c.mustStartAppDev()
 	}
 
-	if c.DevConfig.ServerOnly || isPartOfBatch {
+	if c.ServerOnly || isPartOfBatch {
 		return nil
 	}
 
 	if wfc.RunClientDefinedRevalidateFunc {
-		c.Logger.Infof("revalidating browser")
+		c.Logger.Info("revalidating browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeRevalidate})
 		return nil
 	}
 
 	if !evtDetails.isKirunaCSS || needsHardReloadEvenIfNonGo {
-		c.Logger.Infof("hard reloading browser")
+		c.Logger.Info("hard reloading browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeOther})
 		return nil
 	}
@@ -392,7 +420,7 @@ func (c *Config) mustHandleFileChange(
 		cssType = changeTypeCriticalCSS
 	}
 
-	c.Logger.Infof("hot reloading browser")
+	c.Logger.Info("hot reloading browser")
 	c.mustReloadBroadcast(refreshFilePayload{
 		ChangeType: cssType,
 

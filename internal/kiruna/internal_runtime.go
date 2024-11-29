@@ -32,47 +32,27 @@ type runtimeCache struct {
 }
 
 func (c *Config) RuntimeInitOnce() {
-	if c.PrivateStaticDir == "" {
-		panic("kiruna.Config.PrivateStaticDir is required")
-	}
-	if c.PublicStaticDir == "" {
-		panic("kiruna.Config.PublicStaticDir is required")
-	}
-	if c.StylesDir == "" {
-		panic("kiruna.Config.StylesDir is required")
-	}
-	if c.DistDir == "" {
-		panic("kiruna.Config.DistDir is required")
-	}
-
-	var seenDirs = make(map[string]bool)
-
-	for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.StylesDir, c.DistDir} {
-		if seenDirs[dir] {
-			panic("duplicate dir: " + dir + " in kiruna.Config. PrivateStaticDir, PublicStaticDir, StylesDir, and DistDir must all be unique")
-		}
-		seenDirs[dir] = true
-	}
-
 	c.runtime.initOnce.Do(func() {
 		// cache
 		c.cache = runtimeCache{
 			// FS
-			uniFS:     safecache.New(c.getInitialUniversalFS, getIsDev),
-			uniDirFS:  safecache.New(c.getInitialUniversalDirFS, getIsDev),
-			publicFS:  safecache.New(func() (UniversalFS, error) { return c.getFS(publicDir) }, getIsDev),
-			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, getIsDev),
+			uniFS:     safecache.New(c.getInitialUniversalFS, GetIsDev),
+			uniDirFS:  safecache.New(c.getInitialUniversalDirFS, GetIsDev),
+			publicFS:  safecache.New(func() (UniversalFS, error) { return c.getFS(publicDir) }, GetIsDev),
+			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, GetIsDev),
 
 			// CSS
-			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, getIsDev),
-			styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, getIsDev),
-			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, getIsDev),
+			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),
+			styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, GetIsDev),
+			criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, GetIsDev),
 
 			// Public URLs
-			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGobRuntime, getIsDev),
-			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, getIsDev),
-			publicFileMapDetails: safecache.New(c.getInitialPublicFileMapDetails, getIsDev),
-			publicURLs:           safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, func(string) bool { return getIsDev() }),
+			publicFileMapFromGob: safecache.New(c.getInitialPublicFileMapFromGobRuntime, GetIsDev),
+			publicFileMapURL:     safecache.New(c.getInitialPublicFileMapURL, GetIsDev),
+			publicFileMapDetails: safecache.New(c.getInitialPublicFileMapDetails, GetIsDev),
+			publicURLs: safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, func(string) bool {
+				return GetIsDev()
+			}),
 		}
 	})
 }

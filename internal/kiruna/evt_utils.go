@@ -1,6 +1,7 @@
 package ik
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,13 +75,13 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
 func (c *Config) getIsEmptyFile(evt fsnotify.Event) bool {
 	file, err := os.Open(evt.Name)
 	if err != nil {
-		c.Logger.Errorf("error: failed to open file: %v", err)
+		c.Logger.Error(fmt.Sprintf("error: failed to open file: %v", err))
 		return false
 	}
 	defer file.Close()
 	stat, err := file.Stat()
 	if err != nil {
-		c.Logger.Errorf("error: failed to get file stats: %v", err)
+		c.Logger.Error(fmt.Sprintf("error: failed to get file stats: %v", err))
 		return false
 	}
 	return stat.Size() == 0

@@ -48,7 +48,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		StylesDir:        filepath.Join(testRootDir, "styles"),
 		DistDir:          filepath.Join(testRootDir, "dist"),
 		MainAppEntry:     "cmd/app/main.go",
-		Logger:           &colorlog.Log{},
+		Logger:           colorlog.New("test"),
 	}
 
 	// Initialize the fileSemaphore
@@ -63,11 +63,11 @@ func setupTestEnv(t *testing.T) *testEnv {
 		uniDirFS:              safecache.New(config.getInitialUniversalDirFS, nil),
 		publicFS:              safecache.New(func() (UniversalFS, error) { return config.getFS(publicDir) }, nil),
 		privateFS:             safecache.New(func() (UniversalFS, error) { return config.getFS(privateDir) }, nil),
-		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, getIsDev),
-		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, getIsDev),
-		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, getIsDev),
+		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, GetIsDev),
+		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, GetIsDev),
+		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, GetIsDev),
 		publicFileMapFromGob:  safecache.New(config.getInitialPublicFileMapFromGobRuntime, nil),
-		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, getIsDev),
+		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, GetIsDev),
 		publicURLs:            safecache.NewMap(config.getInitialPublicURL, publicURLsKeyMaker, nil),
 	}
 

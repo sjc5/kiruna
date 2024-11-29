@@ -1,6 +1,7 @@
 package ik
 
 import (
+	"fmt"
 	"html/template"
 	"path/filepath"
 	"strings"
@@ -34,14 +35,14 @@ func (c *Config) getInitialStyleSheetLinkElement() (*template.HTML, error) {
 func (c *Config) getInitialStyleSheetURL() (string, error) {
 	fs, err := c.GetUniversalFS()
 	if err != nil {
-		c.Logger.Errorf("error getting FS: %v", err)
+		c.Logger.Error(fmt.Sprintf("error getting FS: %v", err))
 		return "", err
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	content, err := fs.ReadFile(filepath.Join(internalDir, normalCSSFileRefFile))
 	if err != nil {
-		c.Logger.Errorf("error reading normal CSS URL: %v", err)
+		c.Logger.Error(fmt.Sprintf("error reading normal CSS URL: %v", err))
 		return "", err
 	}
 
@@ -71,7 +72,7 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 	// Get FS
 	fs, err := c.GetUniversalFS()
 	if err != nil {
-		c.Logger.Errorf("error getting FS: %v", err)
+		c.Logger.Error(fmt.Sprintf("error getting FS: %v", err))
 		return nil, err
 	}
 
@@ -83,7 +84,7 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 		result.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
 
 		if !result.noSuchFile {
-			c.Logger.Errorf("error reading critical CSS: %v", err)
+			c.Logger.Error(fmt.Sprintf("error reading critical CSS: %v", err))
 			return nil, err
 		}
 		return result, nil
@@ -99,14 +100,14 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 
 	sha256Hash, err := htmlutil.AddSha256HashInline(&el, true)
 	if err != nil {
-		c.Logger.Errorf("error handling CSP: %v", err)
+		c.Logger.Error(fmt.Sprintf("error handling CSP: %v", err))
 		return nil, err
 	}
 	result.sha256Hash = sha256Hash
 
 	tpmlRes, err := htmlutil.RenderElement(&el)
 	if err != nil {
-		c.Logger.Errorf("error rendering element: %v", err)
+		c.Logger.Error(fmt.Sprintf("error rendering element: %v", err))
 		return nil, err
 	}
 

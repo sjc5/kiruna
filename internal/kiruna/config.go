@@ -2,11 +2,8 @@ package ik
 
 import (
 	"io/fs"
-
-	"github.com/sjc5/kit/pkg/colorlog"
+	"log/slog"
 )
-
-type Logger colorlog.Logger
 
 type Config struct {
 	dev
@@ -19,28 +16,32 @@ type Config struct {
 	// with your binary. For simplicity, we recommend using the embedded FS.
 	DistFS fs.FS
 
-	// Set this relative to the directory you're running commands from (e.g., "./static/private"). Required.
+	// Set this relative to the directory you're running commands from (e.g., "./dist").
+	// Required.
+	// Must be unique from PrivateStaticDir, PublicStaticDir, and StylesDir.
+	DistDir string
+
+	// Set this relative to the directory you're running commands from (e.g., "./static/private").
+	// Required unless you have DevConfig.ServerOnly set to true.
 	// Must be unique from PublicStaticDir, StylesDir, and DistDir.
 	PrivateStaticDir string
 
-	// Set this relative to the directory you're running commands from (e.g., "./static/public"). Required.
+	// Set this relative to the directory you're running commands from (e.g., "./static/public").
+	// Required unless you have DevConfig.ServerOnly set to true.
 	// Must be unique from PrivateStaticDir, StylesDir, and DistDir.
 	PublicStaticDir string
 
-	// Set this relative to the directory you're running commands from (e.g., "./styles"). Required.
+	// Set this relative to the directory you're running commands from (e.g., "./styles").
+	// Required unless you have DevConfig.ServerOnly set to true.
 	// Must be unique from PrivateStaticDir, PublicStaticDir, and DistDir.
 	StylesDir string
-
-	// Set this relative to the directory you're running commands from (e.g., "./dist"). Required.
-	// Must be unique from PrivateStaticDir, PublicStaticDir, and StylesDir.
-	DistDir string
 
 	// Path to your main.go entry file, relative to the directory you're running commands from (e.g., "./cmd/app/main.go"). Required.
 	MainAppEntry string
 
-	DevConfig *DevConfig
-
-	Logger Logger
+	Logger     *slog.Logger
+	ServerOnly bool // If true, skips static asset processing/serving and browser reloading.
+	DevConfig  *DevConfig
 }
 
 type DevConfig struct {
@@ -52,7 +53,6 @@ type DevConfig struct {
 	HealthcheckEndpoint string // e.g., "/healthz" -- should return 200 OK if healthy -- defaults to "/"
 	WatchedFiles        WatchedFiles
 	IgnorePatterns      IgnorePatterns
-	ServerOnly          bool
 }
 
 type WatchedFile struct {

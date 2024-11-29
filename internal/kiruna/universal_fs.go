@@ -59,13 +59,13 @@ func (c *Config) getFS(subDir string) (UniversalFS, error) {
 	FS, err := c.GetUniversalFS()
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)
-		c.Logger.Errorf(errMsg)
+		c.Logger.Error(errMsg)
 		return nil, errors.New(errMsg)
 	}
 	subFS, err := FS.Sub(path)
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)
-		c.Logger.Errorf(errMsg)
+		c.Logger.Error(errMsg)
 		return nil, errors.New(errMsg)
 	}
 	return subFS, nil
@@ -93,9 +93,9 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 	// DEV
 	// There is an expectation that you run the dev server from the root of your project,
 	// where your go.mod file is.
-	if getIsDev() {
+	if GetIsDev() {
 		if useVerboseLogs {
-			c.Logger.Infof("using disk filesystem (dev)")
+			c.Logger.Info("using disk filesystem (dev)")
 		}
 
 		cleanDirs := c.getCleanDirs()
@@ -106,7 +106,7 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 	// If we are using the embedded file system, we should use the dist file system
 	if c.getIsUsingEmbeddedFS() {
 		if useVerboseLogs {
-			c.Logger.Infof("using embedded filesystem (prod)")
+			c.Logger.Info("using embedded filesystem (prod)")
 		}
 
 		// Assuming the embed directive looks like this:
@@ -122,7 +122,7 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 	}
 
 	if useVerboseLogs {
-		c.Logger.Infof("using disk filesystem (prod)")
+		c.Logger.Info("using disk filesystem (prod)")
 	}
 
 	// If we are not using the embedded file system, we should use the os file system,
