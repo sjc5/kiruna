@@ -233,7 +233,7 @@ func websocketHandler(manager *clientManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			// __TODO log here?
+			fmt.Println("error: failed to upgrade ws connection:", err)
 			return
 		}
 
@@ -245,12 +245,11 @@ func websocketHandler(manager *clientManager) http.HandlerFunc {
 			manager.unregister <- client
 		}()
 
-		// Read loop to handle client messages (if needed)
+		// Read routine to handle client messages
 		go func() {
 			defer conn.Close()
 			for {
-				_, _, err := conn.ReadMessage()
-				if err != nil {
+				if _, _, err := conn.ReadMessage(); err != nil {
 					manager.unregister <- client
 					break
 				}

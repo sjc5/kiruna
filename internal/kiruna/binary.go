@@ -16,11 +16,9 @@ func (c *Config) compileBinary() error {
 	buildCmd.Stderr = os.Stderr
 	a := time.Now()
 	err := buildCmd.Run()
-	b := time.Now()
-	c.Logger.Info(fmt.Sprintf("go binary compilation took: %v", b.Sub(a)))
 	if err != nil {
 		return fmt.Errorf("error compiling binary: %v", err)
 	}
-	c.Logger.Info(fmt.Sprintf("compilation complete: %s", buildDest))
+	c.Logger.Info("Compiled Go binary", "duration", time.Since(a), "buildDest", buildDest)
 	return nil
 }

@@ -4,8 +4,8 @@ github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/
 github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/sjc5/kit v0.0.70 h1:jKTeseo7eBJKlD4CZoJyovfuqY55gH0mI4cPILgWjLA=
-github.com/sjc5/kit v0.0.70/go.mod h1:6evTjkACUsyBdNw3oZk/gAh/6bVTRjy8SCgFibOTzm4=
+github.com/sjc5/kit v0.0.72 h1:2gmju2dgb7/RSrbobq+TCjh747zGQZnSATC23mucl/o=
+github.com/sjc5/kit v0.0.72/go.mod h1:6evTjkACUsyBdNw3oZk/gAh/6bVTRjy8SCgFibOTzm4=
 github.com/tdewolff/minify/v2 v2.21.2 h1:VfTvmGVtBYhMTlUAeHtXM7XOsW0JT/6uMwUPPqgUs9k=
 github.com/tdewolff/minify/v2 v2.21.2/go.mod h1:Olje3eHdBnrMjINKffDsil/3NV98Iv7MhWf7556WQVg=
 github.com/tdewolff/parse/v2 v2.7.19 h1:7Ljh26yj+gdLFEq/7q9LT4SYyKtwQX4ocNrj45UCePg=

@@ -13,6 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/sjc5/kit/pkg/grace"
+	"github.com/sjc5/kit/pkg/port"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -66,8 +67,6 @@ func (c *Config) MustStartDev() {
 
 	c.devInitOnce()
 
-	c.killPriorPID()
-
 	// take a breather for prior process to clean up
 	// not sure why needed, but it allows same port to be used
 	time.Sleep(10 * time.Millisecond)
@@ -77,7 +76,7 @@ func (c *Config) MustStartDev() {
 	MustGetPort()
 
 	// Set refresh server port
-	if freePort, err := getFreePort(defaultFreePort); err == nil {
+	if freePort, err := port.GetFreePort(defaultFreePort); err == nil {
 		setRefreshServerPort(freePort)
 	} else {
 		c.Logger.Error(fmt.Sprintf("error: failed to get free port for refresh server: %v", err))
@@ -96,7 +95,7 @@ func (c *Config) MustStartDev() {
 		return
 	}
 
-	c.Logger.Info(fmt.Sprintf("initializing sidecar refresh server on port %d", getRefreshServerPort()))
+	c.Logger.Info("Initializing sidecar refresh server", "port", getRefreshServerPort())
 
 	go c.manager.start()
 	go c.mustSetupWatcher()
@@ -135,12 +134,7 @@ func (c *Config) mustKillAppDev() {
 			c.Logger.Error(errMsg)
 			panic(errMsg)
 		} else {
-			c.Logger.Info(fmt.Sprintf("killed app with pid %d", c.lastBuildCmd.v.Process.Pid))
-
-			if err := c.deletePIDFile(); err != nil {
-				c.Logger.Error(fmt.Sprintf("error: failed to delete PID file: %v", err))
-				// now just move on, not the end of the world
-			}
+			c.Logger.Info("Terminated previous process", "pid", c.lastBuildCmd.v.Process.Pid)
 
 			c.lastBuildCmd.v = nil
 		}
@@ -164,12 +158,7 @@ func (c *Config) mustStartAppDev() {
 		panic(errMsg)
 	}
 
-	c.Logger.Info(fmt.Sprintf("app started with pid %d", c.lastBuildCmd.v.Process.Pid))
-
-	if err := c.writePIDFile(c.lastBuildCmd.v.Process.Pid); err != nil {
-		c.Logger.Error(fmt.Sprintf("error: failed to write PID file: %v", err))
-		// now just move on, not the end of the world
-	}
+	c.Logger.Info("App is running", "pid", c.lastBuildCmd.v.Process.Pid)
 }
 
 func (c *Config) mustHandleWatcherEmissions() {
@@ -276,14 +265,14 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 	eg := errgroup.Group{}
 	if hasMultipleEvents && isGoOrNeedsHardReloadEvenIfNonGo {
 		eg.Go(func() error {
-			c.Logger.Info("killing app")
+			c.Logger.Info("Shutting down running app")
 			c.mustKillAppDev()
 			return nil
 		})
 	}
 
 	for _, evtDetails := range relevantFileChanges {
-		c.Logger.Info(evtDetails.evt.String())
+		c.Logger.Info("[watcher]", "op", evtDetails.evt.Op.String(), "filename", evtDetails.evt.Name)
 
 		err := c.mustHandleFileChange(evtDetails, hasMultipleEvents)
 		if err != nil {
@@ -297,12 +286,12 @@ func (c *Config) processBatchedEvents(events []fsnotify.Event) {
 			c.Logger.Error(fmt.Sprintf("error: failed to kill app: %v", err))
 			return
 		}
-		c.Logger.Info("restarting app")
+		c.Logger.Info("Restarting app")
 		c.mustStartAppDev()
 	}
 
 	if hasMultipleEvents {
-		c.Logger.Info("hard reloading browser")
+		c.Logger.Info("Hard reloading browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeOther})
 	}
 }
@@ -329,7 +318,7 @@ func (c *Config) mustHandleFileChange(
 	needsHardReloadEvenIfNonGo := getNeedsHardReloadEvenIfNonGo(wfc)
 
 	if evtDetails.isGo || wfc.RecompileBinary {
-		c.Logger.Info("recompiling binary")
+		c.Logger.Info("Recompiling Go binary")
 	}
 
 	needsKillAndRestart := (evtDetails.isGo || needsHardReloadEvenIfNonGo) && !isPartOfBatch
@@ -337,7 +326,7 @@ func (c *Config) mustHandleFileChange(
 	killAndRestartEG := errgroup.Group{}
 	if needsKillAndRestart {
 		killAndRestartEG.Go(func() error {
-			c.Logger.Info("killing app")
+			c.Logger.Info("Terminating running app")
 			c.mustKillAppDev()
 			return nil
 		})
@@ -394,7 +383,7 @@ func (c *Config) mustHandleFileChange(
 			c.Logger.Error(fmt.Sprintf("error: failed to kill app: %v", err))
 			return err
 		}
-		c.Logger.Info("restarting app")
+		c.Logger.Info("Restarting app")
 		c.mustStartAppDev()
 	}
 
@@ -403,13 +392,13 @@ func (c *Config) mustHandleFileChange(
 	}
 
 	if wfc.RunClientDefinedRevalidateFunc {
-		c.Logger.Info("revalidating browser")
+		c.Logger.Info("Revalidating browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeRevalidate})
 		return nil
 	}
 
 	if !evtDetails.isKirunaCSS || needsHardReloadEvenIfNonGo {
-		c.Logger.Info("hard reloading browser")
+		c.Logger.Info("Hard reloading browser")
 		c.mustReloadBroadcast(refreshFilePayload{ChangeType: changeTypeOther})
 		return nil
 	}
@@ -420,7 +409,7 @@ func (c *Config) mustHandleFileChange(
 		cssType = changeTypeCriticalCSS
 	}
 
-	c.Logger.Info("hot reloading browser")
+	c.Logger.Info("Hot reloading browser")
 	c.mustReloadBroadcast(refreshFilePayload{
 		ChangeType: cssType,
 

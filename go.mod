@@ -6,7 +6,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.7.1
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/sjc5/kit v0.0.70
+	github.com/sjc5/kit v0.0.72
 	github.com/tdewolff/minify/v2 v2.21.2
 	golang.org/x/sync v0.9.0
 )

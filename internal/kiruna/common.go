@@ -16,7 +16,6 @@ const (
 	criticalCSSFile          = "critical.css"
 	normalCSSFileRefFile     = "normal_css_file_ref.txt"
 	publicFileMapFileRefFile = "public_file_map_file_ref.txt"
-	pidFile                  = "__kiruna_dev.pid"
 	binOutPath               = "bin/main"
 	goEmbedFixerFile         = "x"
 )

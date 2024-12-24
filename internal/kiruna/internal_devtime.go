@@ -28,7 +28,6 @@ type dev struct {
 	defaultWatchedFiles    *[]WatchedFile
 	lastBuildCmd           withMu[*exec.Cmd]
 	matchResults           *safecache.CacheMap[potentialMatch, string, bool]
-	pidFile                *PIDFile
 }
 
 func (c *Config) devInitOnce() {
@@ -77,8 +76,5 @@ func (c *Config) devInitOnce() {
 
 		// matches
 		c.matchResults = safecache.NewMap(c.getInitialMatchResults, c.matchResultsKeyMaker, nil)
-
-		// single file stores
-		c.pidFile = newPIDFile(cleanDirs.Dist)
 	})
 }
