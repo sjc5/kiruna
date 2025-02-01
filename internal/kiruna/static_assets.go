@@ -9,7 +9,7 @@ import (
 )
 
 func (c *Config) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeaders bool) (http.Handler, error) {
-	FS, err := c.GetPublicFS()
+	publicFS, err := c.GetPublicFS()
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting public FS: %v", err)
 		c.Logger.Error(errMsg)
@@ -18,10 +18,10 @@ func (c *Config) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeade
 	if addImmutableCacheHeaders {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-			http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS))).ServeHTTP(w, r)
+			http.StripPrefix(pathPrefix, http.FileServer(http.FS(publicFS))).ServeHTTP(w, r)
 		}), nil
 	}
-	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(FS))), nil
+	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(publicFS))), nil
 }
 
 func (c *Config) getInitialPublicFileMapFromGobBuildtime() (map[string]string, error) {

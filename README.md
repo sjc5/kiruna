@@ -87,8 +87,8 @@ import (
 )
 
 var Kiruna = kiruna.New(&kiruna.Config{
-	DistFS:     			dist.FS,
-	MainAppEntry: 		"cmd/app/main.go",
+	DistFS:           dist.FS,
+	MainAppEntry:     "cmd/app/main.go",
 	PrivateStaticDir: "./static/private",
 	PublicStaticDir:  "./static/public",
 	StylesDir:        "./styles",
@@ -116,18 +116,18 @@ Now copy this into your `static/private/index.go.html` file:
 ```html
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		{{.Kiruna.GetCriticalCSSStyleElement}} {{.Kiruna.GetStyleSheetLinkElement}}
-	</head>
-	<body>
-		<div>
-			<h1>Hello, world!</h1>
-			<p>Hello from "static/private/index.go.html"</p>
-		</div>
-		{{.Kiruna.GetRefreshScript}}
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {{.Kiruna.GetCriticalCSSStyleElement}} {{.Kiruna.GetStyleSheetLinkElement}}
+  </head>
+  <body>
+    <div>
+      <h1>Hello, world!</h1>
+      <p>Hello from "static/private/index.go.html"</p>
+    </div>
+    {{.Kiruna.GetRefreshScript}}
+  </body>
 </html>
 ```
 
@@ -161,14 +161,14 @@ func main() {
 
 	// Serve an HTML file using html/template
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		FS, err := platform.Kiruna.GetPrivateFS()
+		privateFS, err := platform.Kiruna.GetPrivateFS()
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Error loading template", http.StatusInternalServerError)
 			return
 		}
 
-		tmpl, err := template.ParseFS(FS, "index.go.html")
+		tmpl, err := template.ParseFS(privateFS, "index.go.html")
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Error loading template", http.StatusInternalServerError)
@@ -257,8 +257,8 @@ Now paste the following into your `styles/critical/main.css` file, and hit save:
 
 ```css
 body {
-	background-color: darkblue;
-	color: white;
+  background-color: darkblue;
+  color: white;
 }
 ```
 
@@ -272,7 +272,7 @@ Now let's make sure your normal stylesheet is also working. Copy this into your 
 
 ```css
 h1 {
-	color: red;
+  color: red;
 }
 ```
 

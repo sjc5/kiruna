@@ -2,6 +2,7 @@ package kiruna
 
 import (
 	"html/template"
+	"io/fs"
 	"net/http"
 
 	ik "github.com/sjc5/kiruna/internal/kiruna"
@@ -26,11 +27,25 @@ func (k Kiruna) BuildWithoutCompilingGo() error {
 	return k.c.Build(false, false)
 }
 
-func (k Kiruna) GetPublicFS() (UniversalFS, error) {
+func (k Kiruna) GetPublicFS() (fs.FS, error) {
 	return k.c.GetPublicFS()
 }
-func (k Kiruna) GetPrivateFS() (UniversalFS, error) {
+func (k Kiruna) GetPrivateFS() (fs.FS, error) {
 	return k.c.GetPrivateFS()
+}
+func (k Kiruna) MustGetPublicFS() fs.FS {
+	fs, err := k.c.GetPublicFS()
+	if err != nil {
+		panic(err)
+	}
+	return fs
+}
+func (k Kiruna) MustGetPrivateFS() fs.FS {
+	fs, err := k.c.GetPrivateFS()
+	if err != nil {
+		panic(err)
+	}
+	return fs
 }
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 	return k.c.GetPublicURL(originalPublicURL)
@@ -58,8 +73,8 @@ func (k Kiruna) GetCriticalCSSElementID() string {
 func (k Kiruna) GetStyleSheetElementID() string {
 	return ik.StyleSheetElementID
 }
-func (k Kiruna) GetUniversalFS() (UniversalFS, error) {
-	return k.c.GetUniversalFS()
+func (k Kiruna) GetBaseFS() (fs.FS, error) {
+	return k.c.GetBaseFS()
 }
 func (k Kiruna) GetCriticalCSSStyleElement() template.HTML {
 	return k.c.GetCriticalCSSStyleElement()
@@ -112,7 +127,6 @@ type WatchedFiles = ik.WatchedFiles
 type OnChangeFunc = ik.OnChangeFunc
 type OnChange = ik.OnChange
 type IgnorePatterns = ik.IgnorePatterns
-type UniversalFS = ik.UniversalFS
 
 const OnChangeStrategyConcurrent = ik.OnChangeStrategyConcurrent
 const OnChangeStrategyPost = ik.OnChangeStrategyPost

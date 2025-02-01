@@ -1,6 +1,7 @@
 package ik
 
 import (
+	"io/fs"
 	"os"
 	"testing"
 )
@@ -9,20 +10,20 @@ func TestGetPublicFS(t *testing.T) {
 	env := setupTestEnv(t)
 	defer teardownTestEnv(t)
 
-	env.createTestFile(t, "dist/kiruna/static/public/test.txt", "public content")
+	env.createTestFile(t, "dist/kiruna/static/public/test.txt", "public fs content")
 
 	publicFS, err := env.config.GetPublicFS()
 	if err != nil {
 		t.Fatalf("GetPublicFS() error = %v", err)
 	}
 
-	content, err := publicFS.ReadFile("test.txt")
+	content, err := fs.ReadFile(publicFS, "test.txt")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
 
-	if string(content) != "public content" {
-		t.Errorf("ReadFile() content = %v, want %v", string(content), "public content")
+	if string(content) != "public fs content" {
+		t.Errorf("ReadFile() content = %v, want %v", string(content), "public fs content")
 	}
 }
 
@@ -30,60 +31,60 @@ func TestGetPrivateFS(t *testing.T) {
 	env := setupTestEnv(t)
 	defer teardownTestEnv(t)
 
-	env.createTestFile(t, "dist/kiruna/static/private/test.txt", "private content")
+	env.createTestFile(t, "dist/kiruna/static/private/test.txt", "private fs content")
 
 	privateFS, err := env.config.GetPrivateFS()
 	if err != nil {
 		t.Fatalf("GetPrivateFS() error = %v", err)
 	}
 
-	content, err := privateFS.ReadFile("test.txt")
+	content, err := fs.ReadFile(privateFS, "test.txt")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
 
-	if string(content) != "private content" {
-		t.Errorf("ReadFile() content = %v, want %v", string(content), "private content")
+	if string(content) != "private fs content" {
+		t.Errorf("ReadFile() content = %v, want %v", string(content), "private fs content")
 	}
 }
 
-func TestGetUniversalFS(t *testing.T) {
+func TestGetBaseFS(t *testing.T) {
 	env := setupTestEnv(t)
 	defer teardownTestEnv(t)
 
-	env.createTestFile(t, "dist/kiruna/static/public/test.txt", "universal content")
+	env.createTestFile(t, "dist/kiruna/static/public/test.txt", "base fs content")
 
-	universalFS, err := env.config.GetUniversalFS()
+	baseFS, err := env.config.GetBaseFS()
 	if err != nil {
-		t.Fatalf("GetUniversalFS() error = %v", err)
+		t.Fatalf("GetBaseFS() error = %v", err)
 	}
 
-	content, err := universalFS.ReadFile("static/public/test.txt")
+	content, err := fs.ReadFile(baseFS, "static/public/test.txt")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
 
-	if string(content) != "universal content" {
-		t.Errorf("ReadFile() content = %v, want %v", string(content), "universal content")
+	if string(content) != "base fs content" {
+		t.Errorf("ReadFile() content = %v, want %v", string(content), "base fs content")
 	}
 
-	// Test Sub method
-	subFS, err := universalFS.Sub("static/public")
+	// Test Sub
+	subFS, err := fs.Sub(baseFS, "static/public")
 	if err != nil {
 		t.Fatalf("Sub() error = %v", err)
 	}
 
-	content, err = subFS.ReadFile("test.txt")
+	content, err = fs.ReadFile(subFS, "test.txt")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
 
-	if string(content) != "universal content" {
-		t.Errorf("ReadFile() content = %v, want %v", string(content), "universal content")
+	if string(content) != "base fs content" {
+		t.Errorf("ReadFile() content = %v, want %v", string(content), "base fs content")
 	}
 
-	// Test ReadDir method
-	entries, err := universalFS.ReadDir("static")
+	// Test ReadDir
+	entries, err := fs.ReadDir(baseFS, "static")
 	if err != nil {
 		t.Fatalf("ReadDir() error = %v", err)
 	}
@@ -108,8 +109,8 @@ func TestFSEdgeCases(t *testing.T) {
 	defer teardownTestEnv(t)
 
 	t.Run("NonexistentFile", func(t *testing.T) {
-		universalFS, _ := env.config.GetUniversalFS()
-		_, err := universalFS.ReadFile("nonexistent.txt")
+		baseFS, _ := env.config.GetBaseFS()
+		_, err := fs.ReadFile(baseFS, "nonexistent.txt")
 		if !os.IsNotExist(err) {
 			t.Errorf("Expected os.IsNotExist(err) to be true for nonexistent file, got %v", err)
 		}
@@ -117,8 +118,8 @@ func TestFSEdgeCases(t *testing.T) {
 
 	t.Run("EmptyFile", func(t *testing.T) {
 		env.createTestFile(t, "dist/kiruna/static/public/empty.txt", "")
-		universalFS, _ := env.config.GetUniversalFS()
-		content, err := universalFS.ReadFile("static/public/empty.txt")
+		baseFS, _ := env.config.GetBaseFS()
+		content, err := fs.ReadFile(baseFS, "static/public/empty.txt")
 		if err != nil {
 			t.Errorf("Unexpected error reading empty file: %v", err)
 		}
@@ -129,8 +130,8 @@ func TestFSEdgeCases(t *testing.T) {
 
 	t.Run("ReadDirOnFile", func(t *testing.T) {
 		env.createTestFile(t, "dist/kiruna/static/public/test.txt", "content")
-		universalFS, _ := env.config.GetUniversalFS()
-		_, err := universalFS.ReadDir("static/public/test.txt")
+		baseFS, _ := env.config.GetBaseFS()
+		_, err := fs.ReadDir(baseFS, "static/public/test.txt")
 		if err == nil {
 			t.Errorf("Expected error when calling ReadDir on a file")
 		}

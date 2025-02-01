@@ -2,6 +2,7 @@ package ik
 
 import (
 	"html/template"
+	"io/fs"
 	"sync"
 
 	"github.com/sjc5/kit/pkg/safecache"
@@ -14,10 +15,10 @@ type runtime struct {
 
 type runtimeCache struct {
 	// FS
-	uniFS     *safecache.Cache[UniversalFS]
-	uniDirFS  *safecache.Cache[UniversalFS]
-	publicFS  *safecache.Cache[UniversalFS]
-	privateFS *safecache.Cache[UniversalFS]
+	baseFS    *safecache.Cache[fs.FS]
+	baseDirFS *safecache.Cache[fs.FS]
+	publicFS  *safecache.Cache[fs.FS]
+	privateFS *safecache.Cache[fs.FS]
 
 	// CSS
 	styleSheetLinkElement *safecache.Cache[*template.HTML]
@@ -36,10 +37,10 @@ func (c *Config) RuntimeInitOnce() {
 		// cache
 		c.cache = runtimeCache{
 			// FS
-			uniFS:     safecache.New(c.getInitialUniversalFS, GetIsDev),
-			uniDirFS:  safecache.New(c.getInitialUniversalDirFS, GetIsDev),
-			publicFS:  safecache.New(func() (UniversalFS, error) { return c.getFS(publicDir) }, GetIsDev),
-			privateFS: safecache.New(func() (UniversalFS, error) { return c.getFS(privateDir) }, GetIsDev),
+			baseFS:    safecache.New(c.getInitialBaseFS, GetIsDev),
+			baseDirFS: safecache.New(c.getInitialBaseDirFS, GetIsDev),
+			publicFS:  safecache.New(func() (fs.FS, error) { return c.getSubFS(publicDir) }, GetIsDev),
+			privateFS: safecache.New(func() (fs.FS, error) { return c.getSubFS(privateDir) }, GetIsDev),
 
 			// CSS
 			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),

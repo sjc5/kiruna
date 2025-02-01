@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,13 +21,13 @@ const (
 )
 
 func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (map[string]string, error) {
-	fs, err := c.getAppropriateFSMaybeBuildTime(isBuildTime)
+	appropriateFS, err := c.getAppropriateFSMaybeBuildTime(isBuildTime)
 	if err != nil {
 		return nil, fmt.Errorf("error getting FS: %v", err)
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	file, err := fs.Open(filepath.Join(internalDir, gobFileName))
+	file, err := appropriateFS.Open(filepath.Join(internalDir, gobFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening file %s: %v", gobFileName, err)
 	}
@@ -41,11 +42,11 @@ func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (map[strin
 	return mapFromGob, nil
 }
 
-func (c *Config) getAppropriateFSMaybeBuildTime(isBuildTime bool) (UniversalFS, error) {
+func (c *Config) getAppropriateFSMaybeBuildTime(isBuildTime bool) (fs.FS, error) {
 	if isBuildTime {
-		return c.cache.uniDirFS.Get()
+		return c.cache.baseDirFS.Get()
 	}
-	return c.GetUniversalFS()
+	return c.GetBaseFS()
 }
 
 func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
@@ -131,14 +132,14 @@ func (c *Config) getInitialPublicFileMapDetails() (*publicFileMapDetails, error)
 }
 
 func (c *Config) getInitialPublicFileMapURL() (string, error) {
-	fs, err := c.GetUniversalFS()
+	baseFS, err := c.GetBaseFS()
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("error getting FS: %v", err))
 		return "", err
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(filepath.Join(internalDir, publicFileMapFileRefFile))
+	content, err := fs.ReadFile(baseFS, filepath.Join(internalDir, publicFileMapFileRefFile))
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("error reading publicFileMapFileRefFile: %v", err))
 		return "", err

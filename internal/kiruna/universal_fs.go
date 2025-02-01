@@ -11,58 +11,26 @@ import (
 	"github.com/sjc5/kit/pkg/executil"
 )
 
-type UniversalFS interface {
-	ReadFile(name string) ([]byte, error)
-	Open(name string) (fs.File, error)
-	ReadDir(name string) ([]fs.DirEntry, error)
-	Sub(dir string) (UniversalFS, error)
-}
-
-type universalFS struct {
-	FS fs.FS
-}
-
-func (u *universalFS) ReadFile(name string) ([]byte, error) {
-	return fs.ReadFile(u.FS, name)
-}
-
-func (u *universalFS) Open(name string) (fs.File, error) {
-	return u.FS.Open(name)
-}
-
-func (u *universalFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	return fs.ReadDir(u.FS, name)
-}
-
-func (u *universalFS) Sub(dir string) (UniversalFS, error) {
-	subFS, err := fs.Sub(u.FS, dir)
-	if err != nil {
-		return nil, err
-	}
-	return &universalFS{FS: subFS}, nil
-}
-
 func (c *Config) getIsUsingEmbeddedFS() bool {
 	return c.DistFS != nil
 }
 
-func (c *Config) getInitialUniversalDirFS() (UniversalFS, error) {
+func (c *Config) getInitialBaseDirFS() (fs.FS, error) {
 	cleanDirs := c.getCleanDirs()
-	fs := &universalFS{FS: os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir))}
-	return fs, nil
+	return os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir)), nil
 }
 
-func (c *Config) getFS(subDir string) (UniversalFS, error) {
+func (c *Config) getSubFS(subDir string) (fs.FS, error) {
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	path := filepath.Join(staticDir, subDir)
 
-	FS, err := c.GetUniversalFS()
+	baseFS, err := c.GetBaseFS()
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)
 		c.Logger.Error(errMsg)
 		return nil, errors.New(errMsg)
 	}
-	subFS, err := FS.Sub(path)
+	subFS, err := fs.Sub(baseFS, path)
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting %s FS: %v", subDir, err)
 		c.Logger.Error(errMsg)
@@ -71,23 +39,21 @@ func (c *Config) getFS(subDir string) (UniversalFS, error) {
 	return subFS, nil
 }
 
-func (c *Config) GetPublicFS() (UniversalFS, error) {
+func (c *Config) GetPublicFS() (fs.FS, error) {
 	return c.cache.publicFS.Get()
 }
 
-func (c *Config) GetPrivateFS() (UniversalFS, error) {
+func (c *Config) GetPrivateFS() (fs.FS, error) {
 	return c.cache.privateFS.Get()
 }
 
-// GetUniversalFS returns a filesystem interface that works across different environments (dev/prod)
+// GetBaseFS returns a filesystem interface that works across different environments (dev/prod)
 // and supports both embedded and non-embedded filesystems.
-func (c *Config) GetUniversalFS() (UniversalFS, error) {
-	return c.cache.uniFS.Get()
+func (c *Config) GetBaseFS() (fs.FS, error) {
+	return c.cache.baseFS.Get()
 }
 
-// GetUniversalFS returns a filesystem interface that works across different environments (dev/prod)
-// and supports both embedded and non-embedded filesystems.
-func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
+func (c *Config) getInitialBaseFS() (fs.FS, error) {
 	useVerboseLogs := getUseVerboseLogs()
 
 	// DEV
@@ -99,8 +65,7 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 		}
 
 		cleanDirs := c.getCleanDirs()
-		fs := &universalFS{FS: os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir))}
-		return fs, nil
+		return os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir)), nil
 	}
 
 	// If we are using the embedded file system, we should use the dist file system
@@ -113,12 +78,12 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 		// //go:embed kiruna
 		// That means that the kiruna folder itself (not just its contents) is embedded.
 		// So we have to drop down into the kiruna folder here.
-		FS, err := fs.Sub(c.DistFS, kirunaDir)
+		embeddedFS, err := fs.Sub(c.DistFS, kirunaDir)
 		if err != nil {
 			return nil, err
 		}
 
-		return &universalFS{FS: FS}, nil
+		return embeddedFS, nil
 	}
 
 	if useVerboseLogs {
@@ -132,7 +97,5 @@ func (c *Config) getInitialUniversalFS() (UniversalFS, error) {
 		return nil, err
 	}
 
-	return &universalFS{
-		FS: os.DirFS(execDir),
-	}, nil
+	return os.DirFS(execDir), nil
 }

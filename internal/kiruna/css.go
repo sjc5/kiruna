@@ -3,6 +3,7 @@ package ik
 import (
 	"fmt"
 	"html/template"
+	"io/fs"
 	"path/filepath"
 	"strings"
 
@@ -33,14 +34,14 @@ func (c *Config) getInitialStyleSheetLinkElement() (*template.HTML, error) {
 }
 
 func (c *Config) getInitialStyleSheetURL() (string, error) {
-	fs, err := c.GetUniversalFS()
+	baseFS, err := c.GetBaseFS()
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("error getting FS: %v", err))
 		return "", err
 	}
 
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(filepath.Join(internalDir, normalCSSFileRefFile))
+	content, err := fs.ReadFile(baseFS, filepath.Join(internalDir, normalCSSFileRefFile))
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("error reading normal CSS URL: %v", err))
 		return "", err
@@ -70,7 +71,7 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 	result := &criticalCSSStatus{}
 
 	// Get FS
-	fs, err := c.GetUniversalFS()
+	baseFS, err := c.GetBaseFS()
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("error getting FS: %v", err))
 		return nil, err
@@ -78,7 +79,7 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 
 	// Read critical CSS
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(filepath.Join(internalDir, criticalCSSFile))
+	content, err := fs.ReadFile(baseFS, filepath.Join(internalDir, criticalCSSFile))
 	if err != nil {
 		// Check if the error is a non-existent file, and set the noSuchFile flag in the cache
 		result.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")

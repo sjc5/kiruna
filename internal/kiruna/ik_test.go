@@ -1,6 +1,7 @@
 package ik
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,10 +60,10 @@ func setupTestEnv(t *testing.T) *testEnv {
 
 	// Initialize safecache
 	config.runtime.cache = runtimeCache{
-		uniFS:                 safecache.New(config.getInitialUniversalFS, nil),
-		uniDirFS:              safecache.New(config.getInitialUniversalDirFS, nil),
-		publicFS:              safecache.New(func() (UniversalFS, error) { return config.getFS(publicDir) }, nil),
-		privateFS:             safecache.New(func() (UniversalFS, error) { return config.getFS(privateDir) }, nil),
+		baseFS:                safecache.New(config.getInitialBaseFS, nil),
+		baseDirFS:             safecache.New(config.getInitialBaseDirFS, nil),
+		publicFS:              safecache.New(func() (fs.FS, error) { return config.getSubFS(publicDir) }, nil),
+		privateFS:             safecache.New(func() (fs.FS, error) { return config.getSubFS(privateDir) }, nil),
 		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, GetIsDev),
 		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, GetIsDev),
 		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, GetIsDev),
