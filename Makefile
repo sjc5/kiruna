@@ -4,5 +4,5 @@ test-quiet:
 test-loud:
 	@go test -v ./...
 
-bump: test-quiet
+bumper: test-quiet
 	@go run ./scripts/bumper
