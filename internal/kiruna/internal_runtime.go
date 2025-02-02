@@ -9,8 +9,8 @@ import (
 )
 
 type runtime struct {
-	initOnce sync.Once
-	cache    runtimeCache
+	initOnce     sync.Once
+	runtimeCache runtimeCache
 }
 
 type runtimeCache struct {
@@ -32,10 +32,14 @@ type runtimeCache struct {
 	publicURLs           *safecache.CacheMap[string, string, string]
 }
 
-func (c *Config) RuntimeInitOnce() {
+func (c *Config) Private_RuntimeInitOnce_OnlyCallInNewFunc() {
 	c.runtime.initOnce.Do(func() {
+		c.validateConfig()
+
+		c.initializedWithNew = true
+
 		// cache
-		c.cache = runtimeCache{
+		c.runtimeCache = runtimeCache{
 			// FS
 			baseFS:    safecache.New(c.getInitialBaseFS, GetIsDev),
 			baseDirFS: safecache.New(c.getInitialBaseDirFS, GetIsDev),

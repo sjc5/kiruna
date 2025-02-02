@@ -23,6 +23,8 @@ import (
 var noHashPublicDirsByVersion = map[uint8]string{0: "__nohash", 1: "prehashed"}
 
 func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
+	enforceProperInstantiation(c)
+
 	cleanDirs := c.getCleanDirs()
 
 	c.fileSemaphore = semaphore.NewWeighted(100)

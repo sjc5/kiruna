@@ -23,44 +23,21 @@ const (
 	healthCheckWarning  = healthCheckWarningA + "\n" + healthCheckWarningB
 )
 
-func (c *Config) MustStartDev() {
+func (c *Config) MustStartDev(devConfig *DevConfig) {
+	enforceProperInstantiation(c)
+
 	// Short circuit if no dev config
-	if c.DevConfig == nil {
+	if devConfig == nil {
 		errMsg := "error: no dev config found"
 		c.Logger.Error(errMsg)
 		panic(errMsg)
 	}
 
-	if c.DistDir == "" {
-		panic("kiruna.Config.DistDir is required")
-	}
+	c.devConfig = devConfig
 
-	if !c.ServerOnly {
-		if c.PrivateStaticDir == "" {
-			panic("kiruna.Config.PrivateStaticDir is required")
-		}
-		if c.PublicStaticDir == "" {
-			panic("kiruna.Config.PublicStaticDir is required")
-		}
-		if c.StylesDir == "" {
-			panic("kiruna.Config.StylesDir is required")
-		}
-
-		var seenDirs = make(map[string]bool)
-		for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.StylesDir, c.DistDir} {
-			if seenDirs[dir] {
-				panic(fmt.Sprintf(
-					"duplicate dir (%s) in kiruna.Config. PrivateStaticDir, PublicStaticDir, StylesDir, and DistDir must all be unique",
-					dir,
-				))
-			}
-			seenDirs[dir] = true
-		}
-	}
-
-	if len(c.DevConfig.HealthcheckEndpoint) == 0 {
+	if len(c.devConfig.HealthcheckEndpoint) == 0 {
 		c.Logger.Warn(healthCheckWarning)
-		c.DevConfig.HealthcheckEndpoint = "/"
+		c.devConfig.HealthcheckEndpoint = "/"
 	}
 
 	setModeToDev()

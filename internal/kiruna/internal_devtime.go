@@ -58,10 +58,10 @@ func (c *Config) devInitOnce() {
 		for _, p := range *c.naiveIgnoreDirPatterns {
 			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(cleanWatchRoot, p))
 		}
-		for _, p := range c.DevConfig.IgnorePatterns.Dirs {
+		for _, p := range c.devConfig.IgnorePatterns.Dirs {
 			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(cleanWatchRoot, p))
 		}
-		for _, p := range c.DevConfig.IgnorePatterns.Files {
+		for _, p := range c.devConfig.IgnorePatterns.Files {
 			*c.ignoredFilePatterns = append(*c.ignoredFilePatterns, filepath.Join(cleanWatchRoot, p))
 		}
 

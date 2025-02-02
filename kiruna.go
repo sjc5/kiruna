@@ -52,8 +52,7 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 }
 
 func (k Kiruna) MustStartDev(devConfig *DevConfig) {
-	k.c.DevConfig = devConfig
-	k.c.MustStartDev()
+	k.c.MustStartDev(devConfig)
 }
 func (k Kiruna) GetCriticalCSS() template.CSS {
 	return template.CSS(k.c.GetCriticalCSS())
@@ -118,7 +117,7 @@ func New(c *ik.Config) *Kiruna {
 	if c.Logger == nil {
 		c.Logger = colorlog.New("Kiruna")
 	}
-	c.RuntimeInitOnce()
+	c.Private_RuntimeInitOnce_OnlyCallInNewFunc()
 	return &Kiruna{c}
 }
 

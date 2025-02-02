@@ -40,17 +40,17 @@ func (c *Config) getSubFS(subDir string) (fs.FS, error) {
 }
 
 func (c *Config) GetPublicFS() (fs.FS, error) {
-	return c.cache.publicFS.Get()
+	return c.runtimeCache.publicFS.Get()
 }
 
 func (c *Config) GetPrivateFS() (fs.FS, error) {
-	return c.cache.privateFS.Get()
+	return c.runtimeCache.privateFS.Get()
 }
 
 // GetBaseFS returns a filesystem interface that works across different environments (dev/prod)
 // and supports both embedded and non-embedded filesystems.
 func (c *Config) GetBaseFS() (fs.FS, error) {
-	return c.cache.baseFS.Get()
+	return c.runtimeCache.baseFS.Get()
 }
 
 func (c *Config) getInitialBaseFS() (fs.FS, error) {

@@ -44,7 +44,7 @@ func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (map[strin
 
 func (c *Config) getAppropriateFSMaybeBuildTime(isBuildTime bool) (fs.FS, error) {
 	if isBuildTime {
-		return c.cache.baseDirFS.Get()
+		return c.runtimeCache.baseDirFS.Get()
 	}
 	return c.GetBaseFS()
 }
@@ -149,18 +149,18 @@ func (c *Config) getInitialPublicFileMapURL() (string, error) {
 }
 
 func (c *Config) GetPublicFileMapURL() string {
-	url, _ := c.cache.publicFileMapURL.Get()
+	url, _ := c.runtimeCache.publicFileMapURL.Get()
 	return url
 }
 func (c *Config) GetPublicFileMap() (map[string]string, error) {
-	return c.cache.publicFileMapFromGob.Get()
+	return c.runtimeCache.publicFileMapFromGob.Get()
 }
 func (c *Config) GetPublicFileMapElements() template.HTML {
-	details, _ := c.cache.publicFileMapDetails.Get()
+	details, _ := c.runtimeCache.publicFileMapDetails.Get()
 	return details.Elements
 }
 func (c *Config) GetPublicFileMapScriptSha256Hash() string {
-	details, _ := c.cache.publicFileMapDetails.Get()
+	details, _ := c.runtimeCache.publicFileMapDetails.Get()
 	return details.Sha256Hash
 }
 

@@ -16,7 +16,7 @@ func (c *Config) waitForAppReadiness() bool {
 		url := fmt.Sprintf(
 			"http://localhost:%d%s",
 			MustGetPort(),
-			c.DevConfig.HealthcheckEndpoint,
+			c.devConfig.HealthcheckEndpoint,
 		)
 
 		resp, err := http.Get(url)

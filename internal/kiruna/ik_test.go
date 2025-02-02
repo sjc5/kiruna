@@ -59,7 +59,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	config.DistFS = os.DirFS(filepath.Join(testRootDir, "dist"))
 
 	// Initialize safecache
-	config.runtime.cache = runtimeCache{
+	config.runtimeCache = runtimeCache{
 		baseFS:                safecache.New(config.getInitialBaseFS, nil),
 		baseDirFS:             safecache.New(config.getInitialBaseDirFS, nil),
 		publicFS:              safecache.New(func() (fs.FS, error) { return config.getSubFS(publicDir) }, nil),

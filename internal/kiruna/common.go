@@ -37,5 +37,5 @@ func (c *Config) getCleanDirs() cleanDirs {
 }
 
 func (c *Config) getCleanWatchRoot() string {
-	return filepath.Clean(c.DevConfig.WatchRoot)
+	return filepath.Clean(c.devConfig.WatchRoot)
 }

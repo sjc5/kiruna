@@ -51,12 +51,12 @@ func (c *Config) getInitialStyleSheetURL() (string, error) {
 }
 
 func (c *Config) GetStyleSheetLinkElement() template.HTML {
-	res, _ := c.cache.styleSheetLinkElement.Get()
+	res, _ := c.runtimeCache.styleSheetLinkElement.Get()
 	return *res
 }
 
 func (c *Config) GetStyleSheetURL() string {
-	url, _ := c.cache.styleSheetURL.Get()
+	url, _ := c.runtimeCache.styleSheetURL.Get()
 	return url
 }
 
@@ -118,14 +118,14 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 }
 
 func (c *Config) GetCriticalCSS() string {
-	result, _ := c.cache.criticalCSS.Get()
+	result, _ := c.runtimeCache.criticalCSS.Get()
 	return result.codeStr
 }
 func (c *Config) GetCriticalCSSStyleElement() template.HTML {
-	result, _ := c.cache.criticalCSS.Get()
+	result, _ := c.runtimeCache.criticalCSS.Get()
 	return result.styleEl
 }
 func (c *Config) GetCriticalCSSStyleElementSha256Hash() string {
-	result, _ := c.cache.criticalCSS.Get()
+	result, _ := c.runtimeCache.criticalCSS.Get()
 	return result.sha256Hash
 }

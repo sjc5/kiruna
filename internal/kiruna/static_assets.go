@@ -45,7 +45,7 @@ func (c *Config) getPublicURLBuildtime(originalPublicURL string) (string, error)
 }
 
 func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
-	fileMapFromGob, err := c.cache.publicFileMapFromGob.Get()
+	fileMapFromGob, err := c.runtimeCache.publicFileMapFromGob.Get()
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf(
 			"error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err,
@@ -77,7 +77,7 @@ func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromG
 func publicURLsKeyMaker(x string) string { return x }
 
 func (c *Config) GetPublicURL(originalPublicURL string) string {
-	url, _ := c.cache.publicURLs.Get(originalPublicURL)
+	url, _ := c.runtimeCache.publicURLs.Get(originalPublicURL)
 	return url
 }
 

@@ -11,15 +11,15 @@ func (c *Config) mustSetupWatcher() {
 	cleanWatchRoot := c.getCleanWatchRoot()
 
 	// Loop through all WatchedFiles...
-	for i, wfc := range c.DevConfig.WatchedFiles {
+	for i, wfc := range c.devConfig.WatchedFiles {
 		// and make each WatchedFile's Pattern relative to cleanWatchRoot...
-		c.DevConfig.WatchedFiles[i].Pattern = filepath.Join(cleanWatchRoot, wfc.Pattern)
+		c.devConfig.WatchedFiles[i].Pattern = filepath.Join(cleanWatchRoot, wfc.Pattern)
 
 		// then loop through such WatchedFile's OnChangeCallbacks...
 		for j, oc := range wfc.OnChangeCallbacks {
 			// and make each such OnChangeCallback's ExcludedPatterns also relative to cleanWatchRoot
 			for k, p := range oc.ExcludedPatterns {
-				c.DevConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(cleanWatchRoot, p)
+				c.devConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(cleanWatchRoot, p)
 			}
 		}
 	}

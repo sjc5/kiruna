@@ -29,7 +29,7 @@ func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
 
 	var matchingWatchedFile *WatchedFile
 
-	for _, wfc := range c.DevConfig.WatchedFiles {
+	for _, wfc := range c.devConfig.WatchedFiles {
 		isMatch := c.getIsMatch(potentialMatch{pattern: wfc.Pattern, path: evt.Name})
 		if isMatch {
 			matchingWatchedFile = &wfc

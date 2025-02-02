@@ -1,6 +1,7 @@
 package ik
 
 import (
+	"fmt"
 	"io/fs"
 	"log/slog"
 )
@@ -8,6 +9,7 @@ import (
 type Config struct {
 	dev
 	runtime
+	initializedWithNew bool
 
 	// If not nil, the embedded file system will be used in production builds.
 	// If nil, the disk file system will be used in production builds.
@@ -15,6 +17,9 @@ type Config struct {
 	// If nil in prod, you need to make sure that you ship the dist directory
 	// with your binary. For simplicity, we recommend using the embedded FS.
 	DistFS fs.FS
+
+	// Path to your main.go entry file, relative to the directory you're running commands from (e.g., "./cmd/app/main.go"). Required.
+	MainAppEntry string
 
 	// Set this relative to the directory you're running commands from (e.g., "./dist").
 	// Required.
@@ -36,12 +41,9 @@ type Config struct {
 	// Must be unique from PrivateStaticDir, PublicStaticDir, and DistDir.
 	StylesDir string
 
-	// Path to your main.go entry file, relative to the directory you're running commands from (e.g., "./cmd/app/main.go"). Required.
-	MainAppEntry string
-
 	Logger     *slog.Logger
 	ServerOnly bool // If true, skips static asset processing/serving and browser reloading.
-	DevConfig  *DevConfig
+	devConfig  *DevConfig
 }
 
 type DevConfig struct {
@@ -115,4 +117,39 @@ type WatchedFiles []WatchedFile
 type IgnorePatterns struct {
 	Dirs  []string // Glob patterns
 	Files []string // Glob patterns
+}
+
+func (c *Config) validateConfig() {
+	if c.DistDir == "" {
+		panic("kiruna.Config.DistDir is required")
+	}
+
+	if !c.ServerOnly {
+		if c.PrivateStaticDir == "" {
+			panic("kiruna.Config.PrivateStaticDir is required")
+		}
+		if c.PublicStaticDir == "" {
+			panic("kiruna.Config.PublicStaticDir is required")
+		}
+		if c.StylesDir == "" {
+			panic("kiruna.Config.StylesDir is required")
+		}
+
+		var seenDirs = make(map[string]bool)
+		for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.StylesDir, c.DistDir} {
+			if seenDirs[dir] {
+				panic(fmt.Sprintf(
+					"duplicate dir (%s) in kiruna.Config. PrivateStaticDir, PublicStaticDir, StylesDir, and DistDir must all be unique.",
+					dir,
+				))
+			}
+			seenDirs[dir] = true
+		}
+	}
+}
+
+func enforceProperInstantiation(c *Config) {
+	if c == nil || !c.initializedWithNew {
+		panic("Kiruna instances must be initialized by passing a valid, non-nil Config struct ptr to the New function")
+	}
 }
