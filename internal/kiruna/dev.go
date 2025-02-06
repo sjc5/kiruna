@@ -34,6 +34,7 @@ func (c *Config) MustStartDev(devConfig *DevConfig) {
 	}
 
 	c.devConfig = devConfig
+	c.cleanWatchRoot = filepath.Clean(c.devConfig.WatchRoot)
 
 	if len(c.devConfig.HealthcheckEndpoint) == 0 {
 		c.Logger.Warn(healthCheckWarning)
@@ -122,8 +123,7 @@ func (c *Config) mustStartAppDev() {
 	c.lastBuildCmd.mu.Lock()
 	defer c.lastBuildCmd.mu.Unlock()
 
-	cleanDirs := c.getCleanDirs()
-	buildDest := filepath.Join(cleanDirs.Dist, binOutPath)
+	buildDest := c.__dist.S().Bin.S().Main.FullPath()
 
 	c.lastBuildCmd.v = exec.Command(buildDest)
 	c.lastBuildCmd.v.Stdout = os.Stdout

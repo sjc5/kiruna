@@ -50,6 +50,9 @@ func (k Kiruna) MustGetPrivateFS() fs.FS {
 func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 	return k.c.GetPublicURL(originalPublicURL)
 }
+func (k Kiruna) MustGetPublicURLBuildtime(originalPublicURL string) string {
+	return k.c.MustGetPublicURLBuildtime(originalPublicURL)
+}
 
 func (k Kiruna) MustStartDev(devConfig *DevConfig) {
 	k.c.MustStartDev(devConfig)
@@ -112,11 +115,15 @@ func (k Kiruna) GetPublicFileMapURL() string {
 func (k Kiruna) ResolveCSSURLFuncArgs(css string) string {
 	return k.c.ResolveCSSURLFuncArgs(css)
 }
+func (k Kiruna) SetupDistDir() {
+	k.c.SetupDistDir()
+}
 
 func New(c *ik.Config) *Kiruna {
 	if c.Logger == nil {
 		c.Logger = colorlog.New("Kiruna")
 	}
+	c.Private_CommonInitOnce_OnlyCallInNewFunc()
 	c.Private_RuntimeInitOnce_OnlyCallInNewFunc()
 	return &Kiruna{c}
 }
@@ -132,6 +139,5 @@ const OnChangeStrategyPost = ik.OnChangeStrategyPost
 const OnChangeStrategyPre = ik.OnChangeStrategyPre
 const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
 
-var SetupDistDir = ik.SetupDistDir
 var MustGetPort = ik.MustGetPort
 var GetIsDev = ik.GetIsDev

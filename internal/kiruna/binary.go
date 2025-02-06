@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 )
 
 func (c *Config) compileBinary() error {
-	cleanDirs := c.getCleanDirs()
-	buildDest := filepath.Join(cleanDirs.Dist, binOutPath)
+	buildDest := c.__dist.S().Bin.S().Main.FullPath()
 	buildCmd := exec.Command("go", "build", "-o", buildDest, c.MainAppEntry)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr

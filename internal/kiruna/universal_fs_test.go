@@ -89,7 +89,7 @@ func TestGetBaseFS(t *testing.T) {
 		t.Fatalf("ReadDir() error = %v", err)
 	}
 
-	expectedDirs := map[string]bool{"public": true, "private": true}
+	expectedDirs := map[string]bool{PUBLIC: true, PRIVATE: true}
 	for _, entry := range entries {
 		if entry.IsDir() {
 			if !expectedDirs[entry.Name()] {

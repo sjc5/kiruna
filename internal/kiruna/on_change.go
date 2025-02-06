@@ -61,7 +61,7 @@ func (c *Config) runConcurrentOnChangeCallbacks(onChanges *[]OnChange, evtName s
 				continue
 			}
 			eg.Go(func() error {
-				err := o.Func(evtName)
+				err := o.Func()
 				if err != nil {
 					c.Logger.Error(fmt.Sprintf("error running extension callback: %v", err))
 					return err
@@ -90,7 +90,7 @@ func (c *Config) simpleRunOnChangeCallbacks(onChanges *[]OnChange, evtName strin
 		if c.getIsIgnored(evtName, &o.ExcludedPatterns) {
 			continue
 		}
-		err := o.Func(evtName)
+		err := o.Func()
 		if err != nil {
 			c.Logger.Error(fmt.Sprintf("error running extension callback: %v", err))
 			return err

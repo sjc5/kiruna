@@ -8,25 +8,24 @@ import (
 
 func (c *Config) mustSetupWatcher() {
 	defer c.mustKillAppDev()
-	cleanWatchRoot := c.getCleanWatchRoot()
 
 	// Loop through all WatchedFiles...
 	for i, wfc := range c.devConfig.WatchedFiles {
 		// and make each WatchedFile's Pattern relative to cleanWatchRoot...
-		c.devConfig.WatchedFiles[i].Pattern = filepath.Join(cleanWatchRoot, wfc.Pattern)
+		c.devConfig.WatchedFiles[i].Pattern = filepath.Join(c.cleanWatchRoot, wfc.Pattern)
 
 		// then loop through such WatchedFile's OnChangeCallbacks...
 		for j, oc := range wfc.OnChangeCallbacks {
 			// and make each such OnChangeCallback's ExcludedPatterns also relative to cleanWatchRoot
 			for k, p := range oc.ExcludedPatterns {
-				c.devConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(cleanWatchRoot, p)
+				c.devConfig.WatchedFiles[i].OnChangeCallbacks[j].ExcludedPatterns[k] = filepath.Join(c.cleanWatchRoot, p)
 			}
 		}
 	}
 
 	defer c.watcher.Close()
 
-	err := c.addDirs(cleanWatchRoot)
+	err := c.addDirs(c.cleanWatchRoot)
 	if err != nil {
 		errMsg := fmt.Sprintf("error: failed to add directories to watcher: %v", err)
 		c.Logger.Error(errMsg)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/sjc5/kit/pkg/executil"
@@ -16,13 +15,12 @@ func (c *Config) getIsUsingEmbeddedFS() bool {
 }
 
 func (c *Config) getInitialBaseDirFS() (fs.FS, error) {
-	cleanDirs := c.getCleanDirs()
-	return os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir)), nil
+	return os.DirFS(c.__dist.S().Kiruna.FullPath()), nil
 }
 
 func (c *Config) getSubFS(subDir string) (fs.FS, error) {
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	path := filepath.Join(staticDir, subDir)
+	path := filepath.Join(c.__dist.S().Kiruna.S().Static.LastSegment(), subDir)
 
 	baseFS, err := c.GetBaseFS()
 	if err != nil {
@@ -64,8 +62,7 @@ func (c *Config) getInitialBaseFS() (fs.FS, error) {
 			c.Logger.Info("using disk filesystem (dev)")
 		}
 
-		cleanDirs := c.getCleanDirs()
-		return os.DirFS(path.Join(cleanDirs.Dist, distKirunaDir)), nil
+		return os.DirFS(c.__dist.S().Kiruna.FullPath()), nil
 	}
 
 	// If we are using the embedded file system, we should use the dist file system
@@ -78,7 +75,7 @@ func (c *Config) getInitialBaseFS() (fs.FS, error) {
 		// //go:embed kiruna
 		// That means that the kiruna folder itself (not just its contents) is embedded.
 		// So we have to drop down into the kiruna folder here.
-		embeddedFS, err := fs.Sub(c.DistFS, kirunaDir)
+		embeddedFS, err := fs.Sub(c.DistFS, c.__dist.S().Kiruna.LastSegment())
 		if err != nil {
 			return nil, err
 		}

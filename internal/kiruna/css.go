@@ -40,14 +40,19 @@ func (c *Config) getInitialStyleSheetURL() (string, error) {
 		return "", err
 	}
 
+	distKirunaInternal := c.__dist.S().Kiruna.S().Internal
+
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(baseFS, filepath.Join(internalDir, normalCSSFileRefFile))
+	content, err := fs.ReadFile(baseFS, filepath.Join(
+		distKirunaInternal.LastSegment(),
+		distKirunaInternal.S().NormalCSSFileRefDotTXT.LastSegment(),
+	))
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf("error reading normal CSS URL: %v", err))
 		return "", err
 	}
 
-	return "/" + filepath.Join(publicDir, string(content)), nil
+	return "/" + filepath.Join(PUBLIC, string(content)), nil
 }
 
 func (c *Config) GetStyleSheetLinkElement() template.HTML {
@@ -77,9 +82,14 @@ func (c *Config) getInitialCriticalCSSStatus() (*criticalCSSStatus, error) {
 		return nil, err
 	}
 
+	distKirunaInternal := c.__dist.S().Kiruna.S().Internal
+
 	// Read critical CSS
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
-	content, err := fs.ReadFile(baseFS, filepath.Join(internalDir, criticalCSSFile))
+	content, err := fs.ReadFile(baseFS, filepath.Join(
+		distKirunaInternal.LastSegment(),
+		distKirunaInternal.S().CriticalDotCSS.LastSegment(),
+	))
 	if err != nil {
 		// Check if the error is a non-existent file, and set the noSuchFile flag in the cache
 		result.noSuchFile = strings.HasSuffix(err.Error(), "no such file or directory")
