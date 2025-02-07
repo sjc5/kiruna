@@ -25,19 +25,17 @@ var noHashPublicDirsByVersion = map[uint8]string{0: "__nohash", 1: "prehashed"}
 func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 	enforceProperInstantiation(c)
 
-	cleanDirs := c.getCleanDirs()
-
 	c.fileSemaphore = semaphore.NewWeighted(100)
 
 	if !shouldBeGranular {
 
 		// nuke the dist/kiruna directory
-		if err := os.RemoveAll(filepath.Join(cleanDirs.Dist, distKirunaDir)); err != nil {
+		if err := os.RemoveAll(c.__dist.S().Kiruna.FullPath()); err != nil {
 			return fmt.Errorf("error removing dist/kiruna directory: %v", err)
 		}
 
 		// re-make required directories
-		if err := SetupDistDir(cleanDirs.Dist); err != nil {
+		if err := c.SetupDistDir(); err != nil {
 			return fmt.Errorf("error making requisite directories: %v", err)
 		}
 	}
@@ -84,9 +82,7 @@ func (c *Config) buildCSS() error {
 
 // ProcessCSS concatenates and hashes specified CSS files, then saves them to disk.
 func (c *Config) processCSS(subDir string) error {
-	cleanDirs := c.getCleanDirs()
-
-	dirPath := filepath.Join(cleanDirs.Styles, subDir)
+	dirPath := filepath.Join(c.cleanSrcDirs.Styles, subDir)
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		return nil
 	}
@@ -143,9 +139,9 @@ func (c *Config) processCSS(subDir string) error {
 
 	switch subDir {
 	case "critical":
-		outputPath = filepath.Join(cleanDirs.Dist, distKirunaDir, internalDir)
+		outputPath = c.__dist.S().Kiruna.S().Internal.FullPath()
 	case "normal":
-		outputPath = filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, publicDir)
+		outputPath = c.__dist.S().Kiruna.S().Static.S().Public.FullPath()
 	}
 
 	outputFileName := subDir + ".css" // Default for 'critical'
@@ -177,7 +173,7 @@ func (c *Config) processCSS(subDir string) error {
 
 	// If normal, also write to a file called normal_css_ref.txt with the hash
 	if subDir == "normal" {
-		hashFile := filepath.Join(cleanDirs.Dist, distKirunaDir, internalDir, normalCSSFileRefFile)
+		hashFile := c.__dist.S().Kiruna.S().Internal.S().NormalCSSFileRefDotTXT.FullPath()
 		if err := os.WriteFile(hashFile, []byte(outputFileName), 0644); err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
@@ -198,7 +194,7 @@ func (c *Config) processCSS(subDir string) error {
 }
 
 type staticFileProcessorOpts struct {
-	dirName          string
+	basename         string
 	srcDir           string
 	distDir          string
 	mapName          string
@@ -208,12 +204,10 @@ type staticFileProcessorOpts struct {
 }
 
 func (c *Config) handlePublicFiles(shouldBeGranular bool) error {
-	cleanDirs := c.getCleanDirs()
-
 	return c.processStaticFiles(&staticFileProcessorOpts{
-		dirName:          publicDir,
-		srcDir:           cleanDirs.PublicStatic,
-		distDir:          filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, publicDir),
+		basename:         PUBLIC,
+		srcDir:           c.cleanSrcDirs.PublicStatic,
+		distDir:          c.__dist.S().Kiruna.S().Static.S().Public.FullPath(),
 		mapName:          PublicFileMapGobName,
 		shouldBeGranular: shouldBeGranular,
 		getIsNoHashDir: func(path string) (bool, uint8) {
@@ -230,12 +224,10 @@ func (c *Config) handlePublicFiles(shouldBeGranular bool) error {
 }
 
 func (c *Config) copyPrivateFiles(shouldBeGranular bool) error {
-	cleanDirs := c.getCleanDirs()
-
 	return c.processStaticFiles(&staticFileProcessorOpts{
-		dirName:          privateDir,
-		srcDir:           cleanDirs.PrivateStatic,
-		distDir:          filepath.Join(cleanDirs.Dist, distKirunaDir, staticDir, privateDir),
+		basename:         PRIVATE,
+		srcDir:           c.cleanSrcDirs.PrivateStatic,
+		distDir:          c.__dist.S().Kiruna.S().Static.S().Private.FullPath(),
 		mapName:          PrivateFileMapGobName,
 		shouldBeGranular: shouldBeGranular,
 		getIsNoHashDir: func(path string) (bool, uint8) {
@@ -333,7 +325,9 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 				oldDistPath := filepath.Join(opts.distDir, v)
 				err := os.Remove(oldDistPath)
 				if err != nil && !os.IsNotExist(err) {
-					oldMapErr = fmt.Errorf("error removing old static file from dist (%s/%s): %v", opts.dirName, v, err)
+					oldMapErr = fmt.Errorf(
+						"error removing old static file from dist (%s/%s): %v", opts.basename, v, err,
+					)
 					return false
 				}
 			}
@@ -350,7 +344,7 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		return fmt.Errorf("error saving file map: %v", err)
 	}
 
-	if opts.dirName == publicDir {
+	if opts.basename == PUBLIC {
 		err = c.savePublicFileMapJSToInternalPublicDir(toStdMap(&newFileMap))
 		if err != nil {
 			return fmt.Errorf("error saving public file map JSON: %v", err)
@@ -415,7 +409,7 @@ func (c *Config) ResolveCSSURLFuncArgs(css string) string {
 		rawUrl := urlRegex.FindStringSubmatch(match)[1]
 		cleanedUrl := strings.TrimSpace(strings.Trim(rawUrl, "'\""))
 		if !strings.HasPrefix(cleanedUrl, "http") && !strings.Contains(cleanedUrl, "://") {
-			hashedUrl, _ := c.getPublicURLBuildtime(cleanedUrl)
+			hashedUrl := c.MustGetPublicURLBuildtime(cleanedUrl)
 			return fmt.Sprintf("url(%s)", hashedUrl)
 		} else {
 			return match // Leave external URLs unchanged

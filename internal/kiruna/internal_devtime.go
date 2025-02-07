@@ -32,8 +32,6 @@ type dev struct {
 
 func (c *Config) devInitOnce() {
 	c.dev.initOnce.Do(func() {
-		cleanWatchRoot := c.getCleanWatchRoot()
-
 		// watcher
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
@@ -53,25 +51,28 @@ func (c *Config) devInitOnce() {
 		c.ignoredDirPatterns = &[]string{}
 		c.ignoredFilePatterns = &[]string{}
 		c.naiveIgnoreDirPatterns = &[]string{
-			"**/.git", "**/node_modules", "dist/bin", distKirunaDir,
+			"**/.git",
+			"**/node_modules",
+			c.__dist.S().Bin.FullPath(),
+			c.__dist.S().Kiruna.FullPath(),
+			filepath.Join(c.cleanSrcDirs.PublicStatic, noHashPublicDirsByVersion[0]),
+			filepath.Join(c.cleanSrcDirs.PublicStatic, noHashPublicDirsByVersion[1]),
 		}
 		for _, p := range *c.naiveIgnoreDirPatterns {
-			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(cleanWatchRoot, p))
+			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(c.cleanWatchRoot, p))
 		}
 		for _, p := range c.devConfig.IgnorePatterns.Dirs {
-			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(cleanWatchRoot, p))
+			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(c.cleanWatchRoot, p))
 		}
 		for _, p := range c.devConfig.IgnorePatterns.Files {
-			*c.ignoredFilePatterns = append(*c.ignoredFilePatterns, filepath.Join(cleanWatchRoot, p))
+			*c.ignoredFilePatterns = append(*c.ignoredFilePatterns, filepath.Join(c.cleanWatchRoot, p))
 		}
-
-		cleanDirs := c.getCleanDirs()
 
 		// default watched files
 		c.defaultWatchedFile = &WatchedFile{}
 		c.defaultWatchedFiles = &[]WatchedFile{
-			{Pattern: fmt.Sprintf("%s/**/*", cleanDirs.PrivateStatic), RestartApp: true},
-			{Pattern: fmt.Sprintf("%s/**/*", cleanDirs.PublicStatic), RestartApp: true},
+			{Pattern: fmt.Sprintf("%s/**/*", c.cleanSrcDirs.PrivateStatic), RestartApp: true},
+			{Pattern: fmt.Sprintf("%s/**/*", c.cleanSrcDirs.PublicStatic), RestartApp: true},
 		}
 
 		// matches

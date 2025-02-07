@@ -32,16 +32,24 @@ func (c *Config) getInitialPublicFileMapFromGobRuntime() (map[string]string, err
 	return c.loadMapFromGob(PublicFileMapGobName, false)
 }
 
-func (c *Config) getPublicURLBuildtime(originalPublicURL string) (string, error) {
+func (c *Config) MustGetPublicURLBuildtime(originalPublicURL string) string {
 	fileMapFromGob, err := c.getInitialPublicFileMapFromGobBuildtime()
 	if err != nil {
 		c.Logger.Error(fmt.Sprintf(
-			"error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err,
+			"error getting public file map from gob (buildtime) for originalPublicURL %s: %v", originalPublicURL, err,
 		))
-		return "/" + publicDir + "/" + originalPublicURL, err
+		panic(err)
 	}
 
-	return c.getInitialPublicURLInner(originalPublicURL, fileMapFromGob)
+	url, err := c.getInitialPublicURLInner(originalPublicURL, fileMapFromGob)
+	if err != nil {
+		c.Logger.Error(fmt.Sprintf(
+			"error getting initial public URL (buildtime) for originalPublicURL %s: %v", originalPublicURL, err,
+		))
+		panic(err)
+	}
+
+	return url
 }
 
 func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
@@ -50,7 +58,7 @@ func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
 		c.Logger.Error(fmt.Sprintf(
 			"error getting public file map from gob for originalPublicURL %s: %v", originalPublicURL, err,
 		))
-		return "/" + publicDir + "/" + originalPublicURL, err
+		return "/" + PUBLIC + "/" + originalPublicURL, err
 	}
 
 	return c.getInitialPublicURLInner(originalPublicURL, fileMapFromGob)
@@ -62,7 +70,7 @@ func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromG
 	}
 
 	if hashedURL, existsInFileMap := fileMapFromGob[cleanURL(originalPublicURL)]; existsInFileMap {
-		return "/" + publicDir + "/" + hashedURL, nil
+		return "/" + PUBLIC + "/" + hashedURL, nil
 	}
 
 	// If no hashed URL found, return the original URL
@@ -71,7 +79,7 @@ func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromG
 		originalPublicURL,
 	))
 
-	return "/" + publicDir + "/" + originalPublicURL, nil
+	return "/" + PUBLIC + "/" + originalPublicURL, nil
 }
 
 func publicURLsKeyMaker(x string) string { return x }

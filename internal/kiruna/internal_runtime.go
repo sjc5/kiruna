@@ -34,17 +34,12 @@ type runtimeCache struct {
 
 func (c *Config) Private_RuntimeInitOnce_OnlyCallInNewFunc() {
 	c.runtime.initOnce.Do(func() {
-		c.validateConfig()
-
-		c.initializedWithNew = true
-
-		// cache
 		c.runtimeCache = runtimeCache{
 			// FS
 			baseFS:    safecache.New(c.getInitialBaseFS, GetIsDev),
 			baseDirFS: safecache.New(c.getInitialBaseDirFS, GetIsDev),
-			publicFS:  safecache.New(func() (fs.FS, error) { return c.getSubFS(publicDir) }, GetIsDev),
-			privateFS: safecache.New(func() (fs.FS, error) { return c.getSubFS(privateDir) }, GetIsDev),
+			publicFS:  safecache.New(func() (fs.FS, error) { return c.getSubFS(PUBLIC) }, GetIsDev),
+			privateFS: safecache.New(func() (fs.FS, error) { return c.getSubFS(PRIVATE) }, GetIsDev),
 
 			// CSS
 			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),

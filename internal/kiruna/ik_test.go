@@ -43,44 +43,44 @@ func setupTestEnv(t *testing.T) *testEnv {
 		}
 	}
 
-	config := &Config{
-		PrivateStaticDir: filepath.Join(testRootDir, "static", "private"),
-		PublicStaticDir:  filepath.Join(testRootDir, "static", "public"),
+	c := &Config{
+		PrivateStaticDir: filepath.Join(testRootDir, "static", PRIVATE),
+		PublicStaticDir:  filepath.Join(testRootDir, "static", PUBLIC),
 		StylesDir:        filepath.Join(testRootDir, "styles"),
 		DistDir:          filepath.Join(testRootDir, "dist"),
 		MainAppEntry:     "cmd/app/main.go",
 		Logger:           colorlog.New("test"),
 	}
 
+	c.Private_CommonInitOnce_OnlyCallInNewFunc()
+
 	// Initialize the fileSemaphore
-	config.fileSemaphore = semaphore.NewWeighted(100)
+	c.fileSemaphore = semaphore.NewWeighted(100)
 
 	// Set up embedded FS
-	config.DistFS = os.DirFS(filepath.Join(testRootDir, "dist"))
+	c.DistFS = os.DirFS(filepath.Join(testRootDir, "dist"))
 
 	// Initialize safecache
-	config.runtimeCache = runtimeCache{
-		baseFS:                safecache.New(config.getInitialBaseFS, nil),
-		baseDirFS:             safecache.New(config.getInitialBaseDirFS, nil),
-		publicFS:              safecache.New(func() (fs.FS, error) { return config.getSubFS(publicDir) }, nil),
-		privateFS:             safecache.New(func() (fs.FS, error) { return config.getSubFS(privateDir) }, nil),
-		styleSheetLinkElement: safecache.New(config.getInitialStyleSheetLinkElement, GetIsDev),
-		styleSheetURL:         safecache.New(config.getInitialStyleSheetURL, GetIsDev),
-		criticalCSS:           safecache.New(config.getInitialCriticalCSSStatus, GetIsDev),
-		publicFileMapFromGob:  safecache.New(config.getInitialPublicFileMapFromGobRuntime, nil),
-		publicFileMapURL:      safecache.New(config.getInitialPublicFileMapURL, GetIsDev),
-		publicURLs:            safecache.NewMap(config.getInitialPublicURL, publicURLsKeyMaker, nil),
+	c.runtimeCache = runtimeCache{
+		baseFS:                safecache.New(c.getInitialBaseFS, nil),
+		baseDirFS:             safecache.New(c.getInitialBaseDirFS, nil),
+		publicFS:              safecache.New(func() (fs.FS, error) { return c.getSubFS(PUBLIC) }, nil),
+		privateFS:             safecache.New(func() (fs.FS, error) { return c.getSubFS(PRIVATE) }, nil),
+		styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),
+		styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, GetIsDev),
+		criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, GetIsDev),
+		publicFileMapFromGob:  safecache.New(c.getInitialPublicFileMapFromGobRuntime, nil),
+		publicFileMapURL:      safecache.New(c.getInitialPublicFileMapURL, GetIsDev),
+		publicURLs:            safecache.NewMap(c.getInitialPublicURL, publicURLsKeyMaker, nil),
 	}
 
 	// Initialize dev cache if needed
-	config.dev.matchResults = safecache.NewMap(config.getInitialMatchResults, config.matchResultsKeyMaker, nil)
+	c.dev.matchResults = safecache.NewMap(c.getInitialMatchResults, c.matchResultsKeyMaker, nil)
 
 	// Set to production mode for testing
 	os.Setenv(modeKey, "production")
 
-	return &testEnv{
-		config: config,
-	}
+	return &testEnv{config: c}
 }
 
 // teardownTestEnv cleans up the test environment

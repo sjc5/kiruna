@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"sync"
+
+	"github.com/sjc5/kit/pkg/dirs"
 )
 
 type Config struct {
 	dev
 	runtime
 	initializedWithNew bool
+	commonInitOnce     sync.Once
+	devConfig          *DevConfig
+	cleanSrcDirs       CleanSrcDirs
+	cleanWatchRoot     string
+	__dist             *dirs.Dir[Dist]
 
 	// If not nil, the embedded file system will be used in production builds.
 	// If nil, the disk file system will be used in production builds.
@@ -43,7 +51,13 @@ type Config struct {
 
 	Logger     *slog.Logger
 	ServerOnly bool // If true, skips static asset processing/serving and browser reloading.
-	devConfig  *DevConfig
+}
+
+type CleanSrcDirs struct {
+	PrivateStatic string
+	PublicStatic  string
+	Styles        string
+	Dist          string
 }
 
 type DevConfig struct {
@@ -104,7 +118,7 @@ type WatchedFile struct {
 	RunClientDefinedRevalidateFunc bool
 }
 
-type OnChangeFunc func(string) error
+type OnChangeFunc func() error
 
 type OnChange struct {
 	Strategy         string
