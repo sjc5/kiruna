@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/sjc5/kit/pkg/fsutil"
@@ -193,5 +194,6 @@ func (c *Config) GetPublicFileMapKeysBuildtime(excludedPrefixes []string) ([]str
 			keys = append(keys, k)
 		}
 	}
+	sort.Strings(keys)
 	return keys, nil
 }
