@@ -155,8 +155,8 @@ func (inst *Helper) mutateStatements(statements *tsgen.Statements) *tsgen.Statem
 		panic(err)
 	}
 
-	a.Serialize("const PUBLIC_FILE_MAP_KEYS", keys)
-	a.Raw("export type PublicFileMapKey", "typeof PUBLIC_FILE_MAP_KEYS[number]")
+	a.Serialize("const KIRUNA_PUBLIC_ASSETS", keys)
+	a.Raw("export type KirunaPublicAsset", "`${\"/\" | \"\"}${(typeof KIRUNA_PUBLIC_ASSETS)[number]}`")
 
 	return a
 }
