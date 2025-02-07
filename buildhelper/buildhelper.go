@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/sjc5/kiruna"
-	"github.com/sjc5/kit/pkg/envutil"
 	"github.com/sjc5/kit/pkg/executil"
 	"github.com/sjc5/kit/pkg/fsutil"
 	"github.com/sjc5/kit/pkg/tsgen"
@@ -13,7 +12,6 @@ import (
 
 type Helper struct {
 	Kiruna                                        *kiruna.Kiruna    // REQUIRED
-	Env                                           envutil.Env       // REQUIRED
 	DevConfig                                     *kiruna.DevConfig // REQUIRED
 	FilesToVendor                                 [][2]string
 	GetPublicFileMapKeysBuildtimeExcludedPrefixes []string
