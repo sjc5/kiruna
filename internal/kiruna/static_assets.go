@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+type fileVal struct {
+	Val         string
+	IsPrehashed bool
+}
+
+type FileMap map[string]fileVal
+
 func (c *Config) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeaders bool) (http.Handler, error) {
 	publicFS, err := c.GetPublicFS()
 	if err != nil {
@@ -24,11 +31,11 @@ func (c *Config) GetServeStaticHandler(pathPrefix string, addImmutableCacheHeade
 	return http.StripPrefix(pathPrefix, http.FileServer(http.FS(publicFS))), nil
 }
 
-func (c *Config) getInitialPublicFileMapFromGobBuildtime() (map[string]string, error) {
+func (c *Config) getInitialPublicFileMapFromGobBuildtime() (FileMap, error) {
 	return c.loadMapFromGob(PublicFileMapGobName, true)
 }
 
-func (c *Config) getInitialPublicFileMapFromGobRuntime() (map[string]string, error) {
+func (c *Config) getInitialPublicFileMapFromGobRuntime() (FileMap, error) {
 	return c.loadMapFromGob(PublicFileMapGobName, false)
 }
 
@@ -64,13 +71,13 @@ func (c *Config) getInitialPublicURL(originalPublicURL string) (string, error) {
 	return c.getInitialPublicURLInner(originalPublicURL, fileMapFromGob)
 }
 
-func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromGob map[string]string) (string, error) {
+func (c *Config) getInitialPublicURLInner(originalPublicURL string, fileMapFromGob FileMap) (string, error) {
 	if strings.HasPrefix(originalPublicURL, "data:") {
 		return originalPublicURL, nil
 	}
 
 	if hashedURL, existsInFileMap := fileMapFromGob[cleanURL(originalPublicURL)]; existsInFileMap {
-		return "/" + PUBLIC + "/" + hashedURL, nil
+		return "/" + PUBLIC + "/" + hashedURL.Val, nil
 	}
 
 	// If no hashed URL found, return the original URL

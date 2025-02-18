@@ -26,7 +26,7 @@ type runtimeCache struct {
 	criticalCSS           *safecache.Cache[*criticalCSSStatus]
 
 	// Public URLs
-	publicFileMapFromGob *safecache.Cache[map[string]string]
+	publicFileMapFromGob *safecache.Cache[FileMap]
 	publicFileMapURL     *safecache.Cache[string]
 	publicFileMapDetails *safecache.Cache[*publicFileMapDetails]
 	publicURLs           *safecache.CacheMap[string, string, string]

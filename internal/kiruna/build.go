@@ -248,8 +248,8 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 		return nil
 	}
 
-	newFileMap := typed.SyncMap[string, string]{}
-	oldFileMap := typed.SyncMap[string, string]{}
+	newFileMap := typed.SyncMap[string, fileVal]{}
+	oldFileMap := typed.SyncMap[string, fileVal]{}
 
 	// Load old file map if granular updates are enabled
 	if opts.shouldBeGranular {
@@ -320,13 +320,13 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	// Cleanup old moot files if granular updates are enabled
 	if opts.shouldBeGranular {
 		var oldMapErr error
-		oldFileMap.Range(func(k, v string) bool {
+		oldFileMap.Range(func(k string, v fileVal) bool {
 			if newHash, exists := newFileMap.Load(k); !exists || newHash != v {
-				oldDistPath := filepath.Join(opts.distDir, v)
+				oldDistPath := filepath.Join(opts.distDir, v.Val)
 				err := os.Remove(oldDistPath)
 				if err != nil && !os.IsNotExist(err) {
 					oldMapErr = fmt.Errorf(
-						"error removing old static file from dist (%s/%s): %v", opts.basename, v, err,
+						"error removing old static file from dist (%s/%v): %v", opts.basename, v, err,
 					)
 					return false
 				}
@@ -354,7 +354,13 @@ func (c *Config) processStaticFiles(opts *staticFileProcessorOpts) error {
 	return nil
 }
 
-func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFileMap, oldFileMap *typed.SyncMap[string, string], distDir string) error {
+func (c *Config) processFile(
+	fi fileInfo,
+	opts *staticFileProcessorOpts,
+	newFileMap,
+	oldFileMap *typed.SyncMap[string, fileVal],
+	distDir string,
+) error {
 	if err := c.fileSemaphore.Acquire(context.Background(), 1); err != nil {
 		return fmt.Errorf("error acquiring semaphore: %v", err)
 	}
@@ -362,15 +368,17 @@ func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFile
 
 	relativePathUnderscores := strings.ReplaceAll(fi.relativePath, "/", "_")
 
-	var fileIdentifier string
+	var fileIdentifier fileVal
 	if fi.isNoHashDir {
-		fileIdentifier = fi.relativePath
+		fileIdentifier.Val = fi.relativePath
+		fileIdentifier.IsPrehashed = true
 	} else {
 		var err error
-		fileIdentifier, err = getHashedFilenameFromPath(fi.path, relativePathUnderscores)
+		name, err := getHashedFilenameFromPath(fi.path, relativePathUnderscores)
 		if err != nil {
 			return fmt.Errorf("error getting hashed filename: %v", err)
 		}
+		fileIdentifier.Val = name
 	}
 
 	newFileMap.Store(fi.relativePath, fileIdentifier)
@@ -384,7 +392,7 @@ func (c *Config) processFile(fi fileInfo, opts *staticFileProcessorOpts, newFile
 
 	var distPath string
 	if opts.writeWithHash {
-		distPath = filepath.Join(distDir, fileIdentifier)
+		distPath = filepath.Join(distDir, fileIdentifier.Val)
 	} else {
 		distPath = filepath.Join(distDir, fi.relativePath)
 	}
@@ -417,9 +425,9 @@ func (c *Config) ResolveCSSURLFuncArgs(css string) string {
 	})
 }
 
-func toStdMap(sm *typed.SyncMap[string, string]) map[string]string {
-	m := map[string]string{}
-	sm.Range(func(k, v string) bool {
+func toStdMap(sm *typed.SyncMap[string, fileVal]) map[string]fileVal {
+	m := make(map[string]fileVal)
+	sm.Range(func(k string, v fileVal) bool {
 		m[k] = v
 		return true
 	})

@@ -11,6 +11,7 @@ import (
 
 type Config = ik.Config
 type DevConfig = ik.DevConfig
+type FileMap = ik.FileMap
 
 type Kiruna struct {
 	c *Config
@@ -97,11 +98,11 @@ func (k Kiruna) MustGetServeStaticHandler(pathPrefix string, addImmutableCacheHe
 	}
 	return handler
 }
-func (k Kiruna) GetPublicFileMap() (map[string]string, error) {
+func (k Kiruna) GetPublicFileMap() (FileMap, error) {
 	return k.c.GetPublicFileMap()
 }
-func (k Kiruna) GetPublicFileMapKeysBuildtime(excludedPrefixes []string) ([]string, error) {
-	return k.c.GetPublicFileMapKeysBuildtime(excludedPrefixes)
+func (k Kiruna) GetPublicFileMapKeysBuildtime() ([]string, error) {
+	return k.c.GetPublicFileMapKeysBuildtime()
 }
 func (k Kiruna) GetPublicFileMapElements() template.HTML {
 	return k.c.GetPublicFileMapElements()
@@ -141,3 +142,4 @@ const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
 
 var MustGetPort = ik.MustGetPort
 var GetIsDev = ik.GetIsDev
+var SetModeToDev = ik.SetModeToDev

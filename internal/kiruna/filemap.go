@@ -21,7 +21,7 @@ const (
 	PrivateFileMapGobName = "private_filemap.gob"
 )
 
-func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (map[string]string, error) {
+func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (FileMap, error) {
 	appropriateFS, err := c.getAppropriateFSMaybeBuildTime(isBuildTime)
 	if err != nil {
 		return nil, fmt.Errorf("error getting FS: %v", err)
@@ -37,7 +37,7 @@ func (c *Config) loadMapFromGob(gobFileName string, isBuildTime bool) (map[strin
 
 	defer file.Close()
 
-	var mapFromGob map[string]string
+	var mapFromGob FileMap
 	err = fsutil.FromGobInto(file, &mapFromGob)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding gob: %v", err)
@@ -52,7 +52,7 @@ func (c *Config) getAppropriateFSMaybeBuildTime(isBuildTime bool) (fs.FS, error)
 	return c.GetBaseFS()
 }
 
-func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
+func (c *Config) saveMapToGob(mapToSave FileMap, dest string) error {
 	file, err := os.Create(filepath.Join(c.__dist.S().Kiruna.S().Internal.FullPath(), dest))
 	if err != nil {
 		return fmt.Errorf("error creating file: %v", err)
@@ -62,8 +62,13 @@ func (c *Config) saveMapToGob(mapToSave map[string]string, dest string) error {
 	return encoder.Encode(mapToSave)
 }
 
-func (c *Config) savePublicFileMapJSToInternalPublicDir(mapToSave map[string]string) error {
-	mapAsJSON, err := json.Marshal(mapToSave)
+func (c *Config) savePublicFileMapJSToInternalPublicDir(mapToSave FileMap) error {
+	simpleStrMap := make(map[string]string, len(mapToSave))
+	for k, v := range mapToSave {
+		simpleStrMap[k] = v.Val
+	}
+
+	mapAsJSON, err := json.Marshal(simpleStrMap)
 	if err != nil {
 		return fmt.Errorf("error marshalling map to JSON: %v", err)
 	}
@@ -164,7 +169,7 @@ func (c *Config) GetPublicFileMapURL() string {
 	url, _ := c.runtimeCache.publicFileMapURL.Get()
 	return url
 }
-func (c *Config) GetPublicFileMap() (map[string]string, error) {
+func (c *Config) GetPublicFileMap() (FileMap, error) {
 	return c.runtimeCache.publicFileMapFromGob.Get()
 }
 func (c *Config) GetPublicFileMapElements() template.HTML {
@@ -176,21 +181,14 @@ func (c *Config) GetPublicFileMapScriptSha256Hash() string {
 	return details.Sha256Hash
 }
 
-func (c *Config) GetPublicFileMapKeysBuildtime(excludedPrefixes []string) ([]string, error) {
+func (c *Config) GetPublicFileMapKeysBuildtime() ([]string, error) {
 	filemap, err := c.getInitialPublicFileMapFromGobBuildtime()
 	if err != nil {
 		return nil, err
 	}
 	keys := make([]string, 0, len(filemap))
-	for k := range filemap {
-		shouldAppend := true
-		for _, prefix := range excludedPrefixes {
-			if strings.HasPrefix(k, prefix) {
-				shouldAppend = false
-				break
-			}
-		}
-		if shouldAppend {
+	for k, v := range filemap {
+		if !v.IsPrehashed {
 			keys = append(keys, k)
 		}
 	}

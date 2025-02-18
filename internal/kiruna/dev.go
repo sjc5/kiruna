@@ -41,7 +41,7 @@ func (c *Config) MustStartDev(devConfig *DevConfig) {
 		c.devConfig.HealthcheckEndpoint = "/"
 	}
 
-	setModeToDev()
+	SetModeToDev()
 
 	c.devInitOnce()
 

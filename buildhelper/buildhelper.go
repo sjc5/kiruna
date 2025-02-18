@@ -11,17 +11,16 @@ import (
 )
 
 type Helper struct {
-	Kiruna                                        *kiruna.Kiruna    // REQUIRED
-	DevConfig                                     *kiruna.DevConfig // REQUIRED
-	FilesToVendor                                 [][2]string
-	GetPublicFileMapKeysBuildtimeExcludedPrefixes []string
-	GenHook                                       func(MutateStatements) error
-	BuildHook                                     func(isDev bool) error
+	Kiruna        *kiruna.Kiruna    // REQUIRED
+	DevConfig     *kiruna.DevConfig // REQUIRED
+	FilesToVendor [][2]string
+	GenHook       func(MutateStatements) error
+	BuildHook     func(isDev bool) error
 }
 
 func (inst *Helper) Dev() {
+	kiruna.SetModeToDev()
 	inst.mustCommonBuild(true)
-
 	inst.Kiruna.MustStartDev(inst.DevConfig)
 }
 
@@ -41,7 +40,10 @@ func (inst *Helper) ProdBuildNonGo() {
 	}
 }
 
-func (inst *Helper) Gen() {
+func (inst *Helper) Gen(isDev bool) {
+	if isDev {
+		kiruna.SetModeToDev()
+	}
 	if inst.GenHook == nil {
 		panic("kiruna: buildhelper: GenHook is nil")
 	}
@@ -63,7 +65,7 @@ func (inst *Helper) mustCommonBuild(isDev bool) {
 			panic(fmt.Errorf("kiruna: buildhelper: mustCommonBuild: %w", err))
 		}
 
-		inst.Gen()
+		inst.Gen(isDev)
 	}
 
 	if inst.BuildHook != nil {
@@ -132,7 +134,7 @@ func (inst *Helper) Tasks() {
 	case *buildWithoutGoFlag:
 		inst.ProdBuildNonGo()
 	case *genFlag:
-		inst.Gen()
+		inst.Gen(false)
 	}
 }
 
@@ -148,7 +150,7 @@ func (inst *Helper) mutateStatements(statements *tsgen.Statements) *tsgen.Statem
 		a = &tsgen.Statements{}
 	}
 
-	keys, err := inst.Kiruna.GetPublicFileMapKeysBuildtime(inst.GetPublicFileMapKeysBuildtimeExcludedPrefixes)
+	keys, err := inst.Kiruna.GetPublicFileMapKeysBuildtime()
 	if err != nil {
 		panic(err)
 	}

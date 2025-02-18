@@ -51,7 +51,7 @@ func getRefreshServerPort() int {
 	return port
 }
 
-func setModeToDev() {
+func SetModeToDev() {
 	os.Setenv(modeKey, devModeVal)
 }
 
