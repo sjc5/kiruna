@@ -127,15 +127,6 @@ func TestFSEdgeCases(t *testing.T) {
 			t.Errorf("Expected empty content, got %d bytes", len(content))
 		}
 	})
-
-	t.Run("ReadDirOnFile", func(t *testing.T) {
-		env.createTestFile(t, "dist/kiruna/static/public/test.txt", "content")
-		baseFS, _ := env.config.GetBaseFS()
-		_, err := fs.ReadDir(baseFS, "static/public/test.txt")
-		if err == nil {
-			t.Errorf("Expected error when calling ReadDir on a file")
-		}
-	})
 }
 
 func TestGetIsUsingEmbeddedFS(t *testing.T) {

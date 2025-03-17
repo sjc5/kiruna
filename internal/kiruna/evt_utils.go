@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -22,9 +21,14 @@ type EvtDetails struct {
 }
 
 func (c *Config) getEvtDetails(evt fsnotify.Event) *EvtDetails {
-	isCssSimple := filepath.Ext(evt.Name) == ".css"
-	isCriticalCSS := isCssSimple && c.getIsCssEvtType(evt, changeTypeCriticalCSS)
-	isNormalCSS := isCssSimple && c.getIsCssEvtType(evt, changeTypeNormalCSS)
+	cssImportURLsMu.RLock()
+	_, isImportedCritical := criticalReliedUponFiles[evt.Name]
+	_, isImportedNormal := normalReliedUponFiles[evt.Name]
+	cssImportURLsMu.RUnlock()
+
+	isCriticalCSS := evt.Name == c.cleanSources.CriticalCSSFile || isImportedCritical
+	isNormalCSS := evt.Name == c.cleanSources.NormalCSSFile || isImportedNormal
+
 	isKirunaCSS := isCriticalCSS || isNormalCSS
 
 	var matchingWatchedFile *WatchedFile
@@ -85,10 +89,6 @@ func (c *Config) getIsEmptyFile(evt fsnotify.Event) bool {
 		return false
 	}
 	return stat.Size() == 0
-}
-
-func (c *Config) getIsCssEvtType(evt fsnotify.Event, cssType changeType) bool {
-	return strings.HasPrefix(evt.Name, filepath.Join(c.cleanSrcDirs.Styles, string(cssType)))
 }
 
 func (c *Config) getIsNonEmptyCHMODOnly(evt fsnotify.Event) bool {

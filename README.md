@@ -45,14 +45,13 @@ Then run the following commands to create the necessary directories and files fo
 ```sh
 # Scaffold directories
 mkdir -p cmd/app cmd/build cmd/dev
-mkdir -p static/private static/public/prehashed
-mkdir -p styles/critical styles/normal
+mkdir -p private-static public-static/prehashed
 mkdir -p dist/kiruna internal/platform
 
 # Create placeholder files
 touch cmd/app/main.go cmd/build/main.go cmd/dev/main.go
-touch static/private/index.go.html
-touch styles/critical/main.css styles/normal/main.css
+touch private-static/index.go.html
+touch critical.css main.css
 touch dist/kiruna/x dist/dist.go internal/platform/kiruna.go
 ```
 
@@ -88,11 +87,12 @@ import (
 
 var Kiruna = kiruna.New(&kiruna.Config{
 	DistFS:           dist.FS,
-	MainAppEntry:     "cmd/app/main.go",
-	PrivateStaticDir: "./static/private",
-	PublicStaticDir:  "./static/public",
-	StylesDir:        "./styles",
+	MainAppEntry:     "./cmd/app/main.go",
 	DistDir:          "./dist",
+	PrivateStaticDir: "./private-static",
+	PublicStaticDir:  "./public-static",
+	CriticalCSSFile:  "./critical.css",
+	NormalCSSFile:    "./main.css",
 })
 ```
 
@@ -109,9 +109,9 @@ go mod tidy
 
 ---
 
-### Setup `static/private/index.go.html`
+### Setup `./private-static/index.go.html`
 
-Now copy this into your `static/private/index.go.html` file:
+Now copy this into your `./private-static/index.go.html` file:
 
 ```html
 <!DOCTYPE html>
@@ -124,7 +124,7 @@ Now copy this into your `static/private/index.go.html` file:
   <body>
     <div>
       <h1>Hello, world!</h1>
-      <p>Hello from "static/private/index.go.html"</p>
+      <p>Hello from "./private-static/index.go.html"</p>
     </div>
     {{.Kiruna.GetRefreshScript}}
   </body>
@@ -253,7 +253,7 @@ If you copied everything correctly, you should see some logging, with a link to 
 
 ### Edit critical CSS
 
-Now paste the following into your `styles/critical/main.css` file, and hit save:
+Now paste the following into your `critical.css` file, and hit save:
 
 ```css
 body {
@@ -262,13 +262,13 @@ body {
 }
 ```
 
-If you leave your browser open and your dev server running, you should see the changes reflected in your browser nearly instantly via hot CSS reloading. Notice that the CSS above is being inlined into your document head. This is because it is in the `styles/critical` directory.
+If you leave your browser open and your dev server running, you should see the changes reflected in your browser nearly instantly via hot CSS reloading. Notice that the CSS above is being inlined into your document head. This is because your `CriticalCSSFile` config option is set to `./critical.css`.
 
 ---
 
 ### Edit normal CSS
 
-Now let's make sure your normal stylesheet is also working. Copy this into your `styles/normal/main.css` file:
+Now let's make sure your normal stylesheet is also working. Copy this into your `main.css` file:
 
 ```css
 h1 {
@@ -279,13 +279,13 @@ h1 {
 When you hit save, this should also hot reload.
 
 > [!NOTE]
-> You can put multiple css stylesheets into the `styles/critical` and `styles/normal` directories. In each case, the CSS will be minified and concatenated in alphabetical order by filename.
+> If you want to separate your CSS into multiple files, you can do so using CSS `@import` syntax. This also works for your critical CSS file.
 
 ---
 
 ### Edit your HTML template
 
-Now let's try editing your html template at `static/private/index.go.html`.
+Now let's try editing your html template at `./private-static/index.go.html`.
 
 Find the line that says `<h1>Hello, world!</h1>` (line 10) and change it to: `<h1 style="color: green;">Hello, world!</h1>`.
 

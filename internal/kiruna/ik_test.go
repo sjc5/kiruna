@@ -22,13 +22,11 @@ type testEnv struct {
 func setupTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 
+	privateStaticSrcDirName := "private-static"
+	publicStaticSrcDirName := "public-static"
+
 	// Set up the source directory structure
-	sourceDirs := []string{
-		"styles/critical",
-		"styles/normal",
-		"static/public",
-		"static/private",
-	}
+	sourceDirs := []string{privateStaticSrcDirName, publicStaticSrcDirName}
 
 	// Set up the dist directory structure
 	distDirs := []string{
@@ -44,9 +42,10 @@ func setupTestEnv(t *testing.T) *testEnv {
 	}
 
 	c := &Config{
-		PrivateStaticDir: filepath.Join(testRootDir, "static", PRIVATE),
-		PublicStaticDir:  filepath.Join(testRootDir, "static", PUBLIC),
-		StylesDir:        filepath.Join(testRootDir, "styles"),
+		PrivateStaticDir: filepath.Join(testRootDir, privateStaticSrcDirName),
+		PublicStaticDir:  filepath.Join(testRootDir, publicStaticSrcDirName),
+		NormalCSSFile:    filepath.Join(testRootDir, "main.css"),
+		CriticalCSSFile:  filepath.Join(testRootDir, "critical.css"),
 		DistDir:          filepath.Join(testRootDir, "dist"),
 		MainAppEntry:     "cmd/app/main.go",
 		Logger:           colorlog.New("test"),
