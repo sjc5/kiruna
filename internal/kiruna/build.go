@@ -65,12 +65,12 @@ func (c *Config) Build(recompileBinary bool, shouldBeGranular bool) error {
 }
 
 func (c *Config) buildCSS() error {
-	err := c.processCSS("critical")
+	err := c.processCSSCritical()
 	if err != nil {
 		return fmt.Errorf("error processing critical CSS: %v", err)
 	}
 
-	err = c.processCSS("normal")
+	err = c.processCSSNormal()
 	if err != nil {
 		return fmt.Errorf("error processing normal CSS: %v", err)
 	}
@@ -111,7 +111,11 @@ var (
 	esbuildCtxNormal        esbuildCtxSafe = esbuildCtxSafe{}
 )
 
-func (c *Config) processCSS(nature string) error {
+func (c *Config) processCSSCritical() error { return c.__processCSS("critical") }
+func (c *Config) processCSSNormal() error   { return c.__processCSS("normal") }
+
+// nature = "critical" or "normal"
+func (c *Config) __processCSS(nature string) error {
 	entryPoint := c.cleanSources.NormalCSSFile
 	if nature == "critical" {
 		entryPoint = c.cleanSources.CriticalCSSFile

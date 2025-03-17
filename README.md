@@ -253,7 +253,7 @@ If you copied everything correctly, you should see some logging, with a link to 
 
 ### Edit critical CSS
 
-Now paste the following into your `critical.css` file, and hit save:
+Now paste the following into your `./critical.css` file, and hit save:
 
 ```css
 body {
@@ -268,7 +268,7 @@ If you leave your browser open and your dev server running, you should see the c
 
 ### Edit normal CSS
 
-Now let's make sure your normal stylesheet is also working. Copy this into your `main.css` file:
+Now let's make sure your normal stylesheet is also working. Copy this into your `./main.css` file:
 
 ```css
 h1 {

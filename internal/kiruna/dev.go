@@ -407,11 +407,11 @@ func (c *Config) callback(wfc *WatchedFile, evtDetails *EvtDetails) error {
 		if getNeedsHardReloadEvenIfNonGo(wfc) {
 			return c.runOtherFileBuild(wfc)
 		}
-		cssType := changeTypeNormalCSS
 		if evtDetails.isCriticalCSS {
-			cssType = changeTypeCriticalCSS
+			c.processCSSCritical()
+		} else {
+			c.processCSSNormal()
 		}
-		return c.processCSS(string(cssType))
 	}
 
 	return c.runOtherFileBuild(wfc)

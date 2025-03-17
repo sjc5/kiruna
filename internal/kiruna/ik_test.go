@@ -63,8 +63,8 @@ func setupTestEnv(t *testing.T) *testEnv {
 	c.runtimeCache = runtimeCache{
 		baseFS:                safecache.New(c.getInitialBaseFS, nil),
 		baseDirFS:             safecache.New(c.getInitialBaseDirFS, nil),
-		publicFS:              safecache.New(func() (fs.FS, error) { return c.getSubFS(PUBLIC) }, nil),
-		privateFS:             safecache.New(func() (fs.FS, error) { return c.getSubFS(PRIVATE) }, nil),
+		publicFS:              safecache.New(func() (fs.FS, error) { return c.getSubFSPublic() }, nil),
+		privateFS:             safecache.New(func() (fs.FS, error) { return c.getSubFSPrivate() }, nil),
 		styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),
 		styleSheetURL:         safecache.New(c.getInitialStyleSheetURL, GetIsDev),
 		criticalCSS:           safecache.New(c.getInitialCriticalCSSStatus, GetIsDev),

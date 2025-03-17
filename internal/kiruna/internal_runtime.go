@@ -38,8 +38,8 @@ func (c *Config) Private_RuntimeInitOnce_OnlyCallInNewFunc() {
 			// FS
 			baseFS:    safecache.New(c.getInitialBaseFS, GetIsDev),
 			baseDirFS: safecache.New(c.getInitialBaseDirFS, GetIsDev),
-			publicFS:  safecache.New(func() (fs.FS, error) { return c.getSubFS(PUBLIC) }, GetIsDev),
-			privateFS: safecache.New(func() (fs.FS, error) { return c.getSubFS(PRIVATE) }, GetIsDev),
+			publicFS:  safecache.New(func() (fs.FS, error) { return c.getSubFSPublic() }, GetIsDev),
+			privateFS: safecache.New(func() (fs.FS, error) { return c.getSubFSPrivate() }, GetIsDev),
 
 			// CSS
 			styleSheetLinkElement: safecache.New(c.getInitialStyleSheetLinkElement, GetIsDev),
