@@ -55,8 +55,8 @@ func (c *Config) devInitOnce() {
 			"**/node_modules",
 			c.__dist.S().Bin.FullPath(),
 			c.__dist.S().Kiruna.FullPath(),
-			filepath.Join(c.cleanSrcDirs.PublicStatic, noHashPublicDirsByVersion[0]),
-			filepath.Join(c.cleanSrcDirs.PublicStatic, noHashPublicDirsByVersion[1]),
+			filepath.Join(c.cleanSources.PublicStatic, noHashPublicDirsByVersion[0]),
+			filepath.Join(c.cleanSources.PublicStatic, noHashPublicDirsByVersion[1]),
 		}
 		for _, p := range *c.naiveIgnoreDirPatterns {
 			*c.ignoredDirPatterns = append(*c.ignoredDirPatterns, filepath.Join(c.cleanWatchRoot, p))
@@ -71,8 +71,8 @@ func (c *Config) devInitOnce() {
 		// default watched files
 		c.defaultWatchedFile = &WatchedFile{}
 		c.defaultWatchedFiles = &[]WatchedFile{
-			{Pattern: fmt.Sprintf("%s/**/*", c.cleanSrcDirs.PrivateStatic), RestartApp: true},
-			{Pattern: fmt.Sprintf("%s/**/*", c.cleanSrcDirs.PublicStatic), RestartApp: true},
+			{Pattern: fmt.Sprintf("%s/**/*", c.cleanSources.PrivateStatic), RestartApp: true},
+			{Pattern: fmt.Sprintf("%s/**/*", c.cleanSources.PublicStatic), RestartApp: true},
 		}
 
 		// matches

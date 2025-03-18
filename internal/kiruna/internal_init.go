@@ -8,13 +8,14 @@ func (c *Config) Private_CommonInitOnce_OnlyCallInNewFunc() {
 
 		c.initializedWithNew = true
 
-		c.cleanSrcDirs = CleanSrcDirs{
-			PrivateStatic: filepath.Clean(c.PrivateStaticDir),
-			PublicStatic:  filepath.Clean(c.PublicStaticDir),
-			Styles:        filepath.Clean(c.StylesDir),
-			Dist:          filepath.Clean(c.DistDir),
+		c.cleanSources = CleanSources{
+			Dist:             filepath.Clean(c.DistDir),
+			PrivateStatic:    filepath.Clean(c.PrivateStaticDir),
+			PublicStatic:     filepath.Clean(c.PublicStaticDir),
+			CriticalCSSEntry: filepath.Clean(c.CriticalCSSEntry),
+			NormalCSSEntry:   filepath.Clean(c.NormalCSSEntry),
 		}
 
-		c.__dist = toDistLayout(c.cleanSrcDirs.Dist)
+		c.__dist = toDistLayout(c.cleanSources.Dist)
 	})
 }

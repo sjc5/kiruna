@@ -19,7 +19,7 @@ func TestGetCriticalCSS(t *testing.T) {
 
 	result := env.config.GetCriticalCSS()
 	if result != criticalCSS {
-		t.Errorf("GetCriticalCSS() = %v, want %v", result, criticalCSS)
+		t.Errorf("GetCriticalCSS() = %v, want: %v", result, criticalCSS)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestGetCriticalCSSStyleElement(t *testing.T) {
 	}
 
 	if !htmltestutil.CompareNodes(parsedResult, parsedExpected) {
-		t.Errorf("GetCriticalCSSStyleElement() = %v, want %v", result, expected)
+		t.Errorf("GetCriticalCSSStyleElement() = %v, want: %v", parsedResult, parsedExpected)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestGetStyleSheetURL(t *testing.T) {
 	result := env.config.GetStyleSheetURL()
 	expected := "/public/" + normalCSSFile
 	if result != expected {
-		t.Errorf("GetStyleSheetURL() = %v, want %v", result, expected)
+		t.Errorf("GetStyleSheetURL() = %v, want: %v", result, expected)
 	}
 }
 
@@ -71,7 +71,7 @@ func TestGetStyleSheetLinkElement(t *testing.T) {
 	result := env.config.GetStyleSheetLinkElement()
 	expected := template.HTML(`<link rel="stylesheet" href="/public/` + normalCSSFile + `" id="` + StyleSheetElementID + `" />`)
 	if result != expected {
-		t.Errorf("GetStyleSheetLinkElement() = %v, want %v", result, expected)
+		t.Errorf("GetStyleSheetLinkElement() = %v, want: %v", result, expected)
 	}
 }
 
@@ -82,11 +82,11 @@ func TestBuildCSS(t *testing.T) {
 	// Create test CSS files in the source directory
 	criticalCSS := "body { color: red; }"
 	normalCSS := "p { font-size: 16px; }"
-	env.createTestFile(t, "styles/critical/main.css", criticalCSS)
-	env.createTestFile(t, "styles/normal/main.css", normalCSS)
+	env.createTestFile(t, "critical.css", criticalCSS)
+	env.createTestFile(t, "main.css", normalCSS)
 
-	minimizedCriticalCSS := "body{color:red}"
-	minimizedNormalCSS := "p{font-size:16px}"
+	minimizedCriticalCSS := "body{color:red}\n"
+	minimizedNormalCSS := "p{font-size:16px}\n"
 
 	err := env.config.buildCSS()
 	if err != nil {
@@ -99,7 +99,7 @@ func TestBuildCSS(t *testing.T) {
 		t.Fatalf("Failed to read processed critical CSS: %v", err)
 	}
 	if string(processedCriticalCSS) != minimizedCriticalCSS {
-		t.Errorf("Processed critical CSS = %v, want %v", string(processedCriticalCSS), criticalCSS)
+		t.Errorf("Processed critical CSS = %v, want: %v", string(processedCriticalCSS), minimizedCriticalCSS)
 	}
 
 	// Check if normal CSS reference file was created and points to an existing file
@@ -123,6 +123,6 @@ func TestBuildCSS(t *testing.T) {
 		t.Fatalf("Failed to read processed normal CSS: %v", err)
 	}
 	if string(processedNormalCSS) != minimizedNormalCSS {
-		t.Errorf("Processed normal CSS = %v, want %v", string(processedNormalCSS), normalCSS)
+		t.Errorf("Processed normal CSS = %v, want: %v", string(processedNormalCSS), minimizedNormalCSS)
 	}
 }

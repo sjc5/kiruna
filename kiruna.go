@@ -9,12 +9,38 @@ import (
 	"github.com/sjc5/kit/pkg/colorlog"
 )
 
-type Config = ik.Config
-type DevConfig = ik.DevConfig
-type FileMap = ik.FileMap
+type (
+	Kiruna         struct{ c *Config }
+	Config         = ik.Config
+	DevConfig      = ik.DevConfig
+	FileMap        = ik.FileMap
+	WatchedFile    = ik.WatchedFile
+	WatchedFiles   = ik.WatchedFiles
+	OnChange       = ik.OnChange
+	OnChangeFunc   = ik.OnChangeFunc
+	IgnorePatterns = ik.IgnorePatterns
+)
 
-type Kiruna struct {
-	c *Config
+const (
+	OnChangeStrategyPre              = ik.OnChangeStrategyPre
+	OnChangeStrategyConcurrent       = ik.OnChangeStrategyConcurrent
+	OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
+	OnChangeStrategyPost             = ik.OnChangeStrategyPost
+)
+
+var (
+	MustGetPort  = ik.MustGetPort
+	GetIsDev     = ik.GetIsDev
+	SetModeToDev = ik.SetModeToDev
+)
+
+func New(c *ik.Config) *Kiruna {
+	if c.Logger == nil {
+		c.Logger = colorlog.New("Kiruna")
+	}
+	c.Private_CommonInitOnce_OnlyCallInNewFunc()
+	c.Private_RuntimeInitOnce_OnlyCallInNewFunc()
+	return &Kiruna{c}
 }
 
 // If you want to do a custom build command, just use
@@ -54,7 +80,6 @@ func (k Kiruna) GetPublicURL(originalPublicURL string) string {
 func (k Kiruna) MustGetPublicURLBuildtime(originalPublicURL string) string {
 	return k.c.MustGetPublicURLBuildtime(originalPublicURL)
 }
-
 func (k Kiruna) MustStartDev(devConfig *DevConfig) {
 	k.c.MustStartDev(devConfig)
 }
@@ -113,33 +138,6 @@ func (k Kiruna) GetPublicFileMapScriptSha256Hash() string {
 func (k Kiruna) GetPublicFileMapURL() string {
 	return k.c.GetPublicFileMapURL()
 }
-func (k Kiruna) ResolveCSSURLFuncArgs(css string) string {
-	return k.c.ResolveCSSURLFuncArgs(css)
-}
 func (k Kiruna) SetupDistDir() {
 	k.c.SetupDistDir()
 }
-
-func New(c *ik.Config) *Kiruna {
-	if c.Logger == nil {
-		c.Logger = colorlog.New("Kiruna")
-	}
-	c.Private_CommonInitOnce_OnlyCallInNewFunc()
-	c.Private_RuntimeInitOnce_OnlyCallInNewFunc()
-	return &Kiruna{c}
-}
-
-type WatchedFile = ik.WatchedFile
-type WatchedFiles = ik.WatchedFiles
-type OnChangeFunc = ik.OnChangeFunc
-type OnChange = ik.OnChange
-type IgnorePatterns = ik.IgnorePatterns
-
-const OnChangeStrategyConcurrent = ik.OnChangeStrategyConcurrent
-const OnChangeStrategyPost = ik.OnChangeStrategyPost
-const OnChangeStrategyPre = ik.OnChangeStrategyPre
-const OnChangeStrategyConcurrentNoWait = ik.OnChangeStrategyConcurrentNoWait
-
-var MustGetPort = ik.MustGetPort
-var GetIsDev = ik.GetIsDev
-var SetModeToDev = ik.SetModeToDev

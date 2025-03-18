@@ -15,7 +15,7 @@ type Config struct {
 	initializedWithNew bool
 	commonInitOnce     sync.Once
 	devConfig          *DevConfig
-	cleanSrcDirs       CleanSrcDirs
+	cleanSources       CleanSources
 	cleanWatchRoot     string
 	__dist             *dirs.Dir[Dist]
 
@@ -31,33 +31,35 @@ type Config struct {
 
 	// Set this relative to the directory you're running commands from (e.g., "./dist").
 	// Required.
-	// Must be unique from PrivateStaticDir, PublicStaticDir, and StylesDir.
+	// Must be unique from PrivateStaticDir and PublicStaticDir.
 	DistDir string
 
-	// Set this relative to the directory you're running commands from (e.g., "./static/private").
+	// Set this relative to the directory you're running commands from (e.g., "./private-static").
 	// Required unless you have DevConfig.ServerOnly set to true.
-	// Must be unique from PublicStaticDir, StylesDir, and DistDir.
+	// Must be unique from PublicStaticDir and DistDir.
 	PrivateStaticDir string
 
-	// Set this relative to the directory you're running commands from (e.g., "./static/public").
+	// Set this relative to the directory you're running commands from (e.g., "./public-static").
 	// Required unless you have DevConfig.ServerOnly set to true.
-	// Must be unique from PrivateStaticDir, StylesDir, and DistDir.
+	// Must be unique from PrivateStaticDir and DistDir.
 	PublicStaticDir string
 
-	// Set this relative to the directory you're running commands from (e.g., "./styles").
-	// Required unless you have DevConfig.ServerOnly set to true.
-	// Must be unique from PrivateStaticDir, PublicStaticDir, and DistDir.
-	StylesDir string
+	// Set this relative to the directory you're running commands from (e.g., "./critical.css").
+	CriticalCSSEntry string
+
+	// Set this relative to the directory you're running commands from (e.g., "./main.css").
+	NormalCSSEntry string
 
 	Logger     *slog.Logger
 	ServerOnly bool // If true, skips static asset processing/serving and browser reloading.
 }
 
-type CleanSrcDirs struct {
-	PrivateStatic string
-	PublicStatic  string
-	Styles        string
-	Dist          string
+type CleanSources struct {
+	Dist             string
+	PrivateStatic    string
+	PublicStatic     string
+	CriticalCSSEntry string
+	NormalCSSEntry   string
 }
 
 type DevConfig struct {
@@ -145,15 +147,12 @@ func (c *Config) validateConfig() {
 		if c.PublicStaticDir == "" {
 			panic("kiruna.Config.PublicStaticDir is required")
 		}
-		if c.StylesDir == "" {
-			panic("kiruna.Config.StylesDir is required")
-		}
 
 		var seenDirs = make(map[string]bool)
-		for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.StylesDir, c.DistDir} {
+		for _, dir := range []string{c.PrivateStaticDir, c.PublicStaticDir, c.DistDir} {
 			if seenDirs[dir] {
 				panic(fmt.Sprintf(
-					"duplicate dir (%s) in kiruna.Config. PrivateStaticDir, PublicStaticDir, StylesDir, and DistDir must all be unique.",
+					"duplicate dir (%s) in kiruna.Config. PrivateStaticDir, PublicStaticDir, and DistDir must all be unique.",
 					dir,
 				))
 			}

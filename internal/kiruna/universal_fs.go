@@ -18,7 +18,11 @@ func (c *Config) getInitialBaseDirFS() (fs.FS, error) {
 	return os.DirFS(c.__dist.S().Kiruna.FullPath()), nil
 }
 
-func (c *Config) getSubFS(subDir string) (fs.FS, error) {
+func (c *Config) getSubFSPrivate() (fs.FS, error) { return c.__getSubFS(PRIVATE) }
+func (c *Config) getSubFSPublic() (fs.FS, error)  { return c.__getSubFS(PUBLIC) }
+
+// subDir = "public" or "private"
+func (c *Config) __getSubFS(subDir string) (fs.FS, error) {
 	// __LOCATION_ASSUMPTION: Inside "dist/kiruna"
 	path := filepath.Join(c.__dist.S().Kiruna.S().Static.LastSegment(), subDir)
 
