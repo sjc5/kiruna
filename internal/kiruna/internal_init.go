@@ -9,11 +9,11 @@ func (c *Config) Private_CommonInitOnce_OnlyCallInNewFunc() {
 		c.initializedWithNew = true
 
 		c.cleanSources = CleanSources{
-			Dist:            filepath.Clean(c.DistDir),
-			PrivateStatic:   filepath.Clean(c.PrivateStaticDir),
-			PublicStatic:    filepath.Clean(c.PublicStaticDir),
-			CriticalCSSFile: filepath.Clean(c.CriticalCSSFile),
-			NormalCSSFile:   filepath.Clean(c.NormalCSSFile),
+			Dist:             filepath.Clean(c.DistDir),
+			PrivateStatic:    filepath.Clean(c.PrivateStaticDir),
+			PublicStatic:     filepath.Clean(c.PublicStaticDir),
+			CriticalCSSEntry: filepath.Clean(c.CriticalCSSEntry),
+			NormalCSSEntry:   filepath.Clean(c.NormalCSSEntry),
 		}
 
 		c.__dist = toDistLayout(c.cleanSources.Dist)

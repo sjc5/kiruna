@@ -116,9 +116,9 @@ func (c *Config) processCSSNormal() error   { return c.__processCSS("normal") }
 
 // nature = "critical" or "normal"
 func (c *Config) __processCSS(nature string) error {
-	entryPoint := c.cleanSources.NormalCSSFile
+	entryPoint := c.cleanSources.NormalCSSEntry
 	if nature == "critical" {
-		entryPoint = c.cleanSources.CriticalCSSFile
+		entryPoint = c.cleanSources.CriticalCSSEntry
 	}
 
 	if entryPoint == "" {
@@ -178,9 +178,9 @@ func (c *Config) __processCSS(nature string) error {
 		return fmt.Errorf("error unmarshalling esbuild metafile: %v", err)
 	}
 
-	srcURL := c.cleanSources.NormalCSSFile
+	srcURL := c.cleanSources.NormalCSSEntry
 	if nature == "critical" {
-		srcURL = c.cleanSources.CriticalCSSFile
+		srcURL = c.cleanSources.CriticalCSSEntry
 	}
 
 	imports := metafile.Inputs[srcURL].Imports

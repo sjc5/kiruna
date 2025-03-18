@@ -44,8 +44,8 @@ func setupTestEnv(t *testing.T) *testEnv {
 	c := &Config{
 		PrivateStaticDir: filepath.Join(testRootDir, privateStaticSrcDirName),
 		PublicStaticDir:  filepath.Join(testRootDir, publicStaticSrcDirName),
-		NormalCSSFile:    filepath.Join(testRootDir, "main.css"),
-		CriticalCSSFile:  filepath.Join(testRootDir, "critical.css"),
+		NormalCSSEntry:   filepath.Join(testRootDir, "main.css"),
+		CriticalCSSEntry: filepath.Join(testRootDir, "critical.css"),
 		DistDir:          filepath.Join(testRootDir, "dist"),
 		MainAppEntry:     "cmd/app/main.go",
 		Logger:           colorlog.New("test"),

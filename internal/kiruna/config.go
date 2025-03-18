@@ -45,21 +45,21 @@ type Config struct {
 	PublicStaticDir string
 
 	// Set this relative to the directory you're running commands from (e.g., "./critical.css").
-	CriticalCSSFile string
+	CriticalCSSEntry string
 
 	// Set this relative to the directory you're running commands from (e.g., "./main.css").
-	NormalCSSFile string
+	NormalCSSEntry string
 
 	Logger     *slog.Logger
 	ServerOnly bool // If true, skips static asset processing/serving and browser reloading.
 }
 
 type CleanSources struct {
-	Dist            string
-	PrivateStatic   string
-	PublicStatic    string
-	CriticalCSSFile string
-	NormalCSSFile   string
+	Dist             string
+	PrivateStatic    string
+	PublicStatic     string
+	CriticalCSSEntry string
+	NormalCSSEntry   string
 }
 
 type DevConfig struct {

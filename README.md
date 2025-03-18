@@ -91,8 +91,8 @@ var Kiruna = kiruna.New(&kiruna.Config{
 	DistDir:          "./dist",
 	PrivateStaticDir: "./private-static",
 	PublicStaticDir:  "./public-static",
-	CriticalCSSFile:  "./critical.css",
-	NormalCSSFile:    "./main.css",
+	CriticalCSSEntry:  "./critical.css",
+	NormalCSSEntry:    "./main.css",
 })
 ```
 
@@ -262,7 +262,7 @@ body {
 }
 ```
 
-If you leave your browser open and your dev server running, you should see the changes reflected in your browser nearly instantly via hot CSS reloading. Notice that the CSS above is being inlined into your document head. This is because your `CriticalCSSFile` config option is set to `./critical.css`.
+If you leave your browser open and your dev server running, you should see the changes reflected in your browser nearly instantly via hot CSS reloading. Notice that the CSS above is being inlined into your document head. This is because your `CriticalCSSEntry` config option is set to `./critical.css`.
 
 ---
 
